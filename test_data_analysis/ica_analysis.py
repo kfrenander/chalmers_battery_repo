@@ -7,10 +7,10 @@ from scipy.signal import savgol_filter, argrelextrema
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal.windows import gaussian
 from matplotlib.collections import LineCollection
-from PythonScripts.test_data_analysis.read_neware_file import read_neware_xls
+from test_data_analysis.read_neware_file import read_neware_xls
 import os
 import matplotlib as mpl
-from PythonScripts.test_data_analysis.tesla_half_cell import gauss_win_kf
+from test_data_analysis.tesla_half_cell import gauss_win_kf
 
 # plt.style.use('chalmers_KF')
 mpl.rc('lines', linewidth=0.8)

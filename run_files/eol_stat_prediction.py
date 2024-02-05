@@ -1,6 +1,6 @@
 import numpy as np
 from matplotlib.ticker import FormatStrFormatter
-from PythonScripts.misc_classes.EndOfLifeProcessing import EndOfLifeProcessing
+from misc_classes.EndOfLifeProcessing import EndOfLifeProcessing
 import matplotlib.pyplot as plt
 import os
 import pickle

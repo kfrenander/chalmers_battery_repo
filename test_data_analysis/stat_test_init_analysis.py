@@ -1,12 +1,12 @@
-from PythonScripts.test_data_analysis.read_neware_file import read_neware_xls
+from test_data_analysis.read_neware_file import read_neware_xls
 import matplotlib.pyplot as plt
-from PythonScripts.test_data_analysis.rpt_analysis import characterise_steps, find_step_characteristics
-from PythonScripts.test_data_analysis.three_electrode_ici import read_neware_v80
-from PythonScripts.test_data_analysis.ica_analysis import perform_ica
+from test_data_analysis.rpt_analysis import characterise_steps, find_step_characteristics
+from test_data_analysis.three_electrode_ici import read_neware_v80
+from test_data_analysis.ica_analysis import perform_ica
 import numpy as np
 import pandas as pd
 import os
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 fix_mpl_backend()
 # plt.style.use('chalmers_kf')
 

@@ -106,7 +106,7 @@ class BasePecData(object):
         return name_update_dict
 
     def read_pec_file(self, fname):
-        from PythonScripts.test_data_analysis.read_pec_file import find_data_init_row
+        from test_data_analysis.read_pec_file import find_data_init_row
         try:
             raw_df = pd.read_csv(fname, skiprows=self.data_init_row)
             raw_df.columns = [self.col_name_dict[c] for c in raw_df.columns]

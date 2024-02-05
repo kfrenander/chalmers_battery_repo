@@ -3,14 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 import pandas as pd
-from PythonScripts.rpt_data_analysis.ReadRptClass import OrganiseRpts
-from PythonScripts.misc_classes.PopulationParameterEstimation import PopulationParameterEstimator as ppe
-from PythonScripts.misc_classes.ExponentialDecayFitter import ExponentialDecayFitter as edf
-from PythonScripts.misc_classes.EndOfLifeProcessing import EndOfLifeProcessing as eolpp
+from rpt_data_analysis.ReadRptClass import OrganiseRpts
+from misc_classes.PopulationParameterEstimation import PopulationParameterEstimator as ppe
+from misc_classes.ExponentialDecayFitter import ExponentialDecayFitter as edf
+from misc_classes.EndOfLifeProcessing import EndOfLifeProcessing as eolpp
 from itertools import combinations
 from scipy.stats import f_oneway, norm, zscore, ttest_rel
 import os
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 fix_mpl_backend()
 my_style = 'kelly_colors'
 plt.style.use(my_style)

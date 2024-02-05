@@ -4,7 +4,7 @@ import matplotlib as mpl
 import pandas as pd
 from scipy.interpolate import interp1d
 import numpy as np
-from PythonScripts.rpt_data_analysis.ReadRptClass import OrganiseRpts
+from rpt_data_analysis.ReadRptClass import OrganiseRpts
 import os
 import natsort
 plt.rcParams['axes.grid'] = True

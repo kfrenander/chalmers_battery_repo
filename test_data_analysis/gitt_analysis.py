@@ -1,9 +1,9 @@
 import pandas as pd
 
-from PythonScripts.test_data_analysis.read_neware_file import read_neware_xls
+from test_data_analysis.read_neware_file import read_neware_xls
 import numpy as np
 import matplotlib.pyplot as plt
-from PythonScripts.test_data_analysis.tesla_half_cell import data_reader
+from test_data_analysis.tesla_half_cell import data_reader
 from scipy.optimize import minimize, brute
 from scipy.interpolate import interp1d
 import scipy.constants

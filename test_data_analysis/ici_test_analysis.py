@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from PythonScripts.test_data_analysis.read_neware_file import read_neware_xls
+from test_data_analysis.read_neware_file import read_neware_xls
 from scipy import signal
 plt.style.use('seaborn-bright')
 

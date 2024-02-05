@@ -1,6 +1,6 @@
 import pandas as pd
 import re
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 fix_mpl_backend()
 
 

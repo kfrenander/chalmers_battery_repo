@@ -1,7 +1,7 @@
-from PythonScripts.test_data_analysis.read_neware_file import read_neware_xls
+from test_data_analysis.read_neware_file import read_neware_xls
 import pandas as pd
-from PythonScripts.test_data_analysis.ica_analysis import make_ica_dva_plots
-from PythonScripts.test_data_analysis.basic_plotting import volt_curr_plot, cap_v_volt_multicolor
+from test_data_analysis.ica_analysis import make_ica_dva_plots
+from test_data_analysis.basic_plotting import volt_curr_plot, cap_v_volt_multicolor
 import os
 
 

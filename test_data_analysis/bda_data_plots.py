@@ -4,12 +4,12 @@ import matplotlib as mpl
 import pandas as pd
 from scipy.interpolate import interp1d
 import numpy as np
-from PythonScripts.rpt_data_analysis.ReadRptClass import OrganiseRpts, look_up_fce
-#from PythonScripts.test_data_analysis.rpt_analysis import characterise_steps
-from PythonScripts.test_data_analysis.ica_analysis import perform_ica
+from rpt_data_analysis.ReadRptClass import OrganiseRpts, look_up_fce
+#from test_data_analysis.rpt_analysis import characterise_steps
+from test_data_analysis.ica_analysis import perform_ica
 import os
 from scipy.signal import find_peaks
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 
 #plt.style.use('seaborn-poster')
 
@@ -41,7 +41,7 @@ new_fig_folder = r"Z:\Documents\Papers\TeslaLowFrequencyPulse\updated_images"
 
 
 def ica_from_raw_rpt(df):
-    import PythonScripts.test_data_analysis.rpt_analysis as rpt_analysis
+    import test_data_analysis.rpt_analysis as rpt_analysis
     step_df = rpt_analysis.characterise_steps(df)
     ica = df[df.arb_step2.isin(step_df[step_df.step_duration > 10 * 3600]['step_nbr'])]
     ica = perform_ica(ica)

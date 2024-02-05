@@ -1,6 +1,6 @@
-from PythonScripts.test_data_analysis.BaseNewareDataClass import BaseNewareDataSet, BaseNewareData
-from PythonScripts.test_data_analysis.NewareDataTesla import TeslaRptData
-from PythonScripts.test_data_analysis.rpt_analysis import characterise_steps
+from test_data_analysis.BaseNewareDataClass import BaseNewareDataSet, BaseNewareData
+from test_data_analysis.NewareDataTesla import TeslaRptData
+from test_data_analysis.rpt_analysis import characterise_steps
 import os
 import re
 import datetime as dt

@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from PythonScripts.rpt_data_analysis.ReadRptClass import OrganiseRpts, ReadRpt
+from rpt_data_analysis.ReadRptClass import OrganiseRpts, ReadRpt
 import matplotlib.pyplot as plt
 import os
 import re

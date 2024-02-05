@@ -5,7 +5,7 @@ import datetime as dt
 import numpy as np
 import re
 from natsort.natsort import natsorted
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 import os
 
 
@@ -85,7 +85,7 @@ class BaseNewareData(object):
         return None
 
     def step_characteristics(self, n_cores=8):
-        from PythonScripts.test_data_analysis.rpt_analysis import characterise_steps
+        from test_data_analysis.rpt_analysis import characterise_steps
         from multiprocessing import Pool
         char_start = dt.datetime.now()
         df_split = np.array_split(self.dyn_df, n_cores)
@@ -320,8 +320,8 @@ class BaseNewareData(object):
 class BaseRptData(object):
 
     def __init__(self, rpt_dict, ica_step_list):
-        from PythonScripts.test_data_analysis.rpt_analysis import find_step_characteristics, find_res
-        from PythonScripts.test_data_analysis.capacity_test_analysis import find_cap_meas
+        from test_data_analysis.rpt_analysis import find_step_characteristics, find_res
+        from test_data_analysis.capacity_test_analysis import find_cap_meas
         self.rpt_dict = rpt_dict
         # self.sort_individual_rpt(rpt_df)
         self.char_dict = {key: find_step_characteristics(self.rpt_dict[key]) for key in self.rpt_dict}
@@ -364,7 +364,7 @@ class BaseRptData(object):
                     self.rpt_dict['rpt_{}'.format(i + 1)].volt, label='RPT voltage')
 
     def ica_analysis(self):
-        from PythonScripts.test_data_analysis.ica_analysis import perform_ica
+        from test_data_analysis.ica_analysis import perform_ica
         for key in self.ica_dict:
             ica_df = self.ica_dict[key]
             try:

@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from scipy.signal import square
 import os
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 from scipy.stats import f_oneway
 fix_mpl_backend()
 

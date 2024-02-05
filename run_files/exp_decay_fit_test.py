@@ -1,6 +1,6 @@
-from PythonScripts.misc_classes.ExponentialDecayFitter import ExponentialDecayFitter as edf
+from misc_classes.ExponentialDecayFitter import ExponentialDecayFitter as edf
 import pickle
-from PythonScripts.plot_scripts_for_papers.stat_article_plot import calculate_eol_stat
+from plot_scripts_for_papers.stat_article_plot import calculate_eol_stat
 import os
 import matplotlib.pyplot as plt
 

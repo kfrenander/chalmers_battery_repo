@@ -1,7 +1,7 @@
 import pickle
 import matplotlib.pyplot as plt
 import os
-from PythonScripts.plot_scripts_for_papers.stat_article_plot import (extract_combinations, retrieve_samples,
+from plot_scripts_for_papers.stat_article_plot import (extract_combinations, retrieve_samples,
                                                                      make_comb_set, box_plot_on_data_dct, fail_prob_plot)
 from scipy import stats
 import numpy as np

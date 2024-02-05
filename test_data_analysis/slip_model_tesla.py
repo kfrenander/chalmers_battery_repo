@@ -7,9 +7,9 @@ from scipy.optimize import curve_fit
 import os
 import re
 import sys
-from PythonScripts.test_data_analysis.tesla_half_cell import data_reader
-from PythonScripts.test_data_analysis.ica_analysis import ica_on_arb_data
-from PythonScripts.test_data_analysis.tesla_data_plot import look_up_fce_nrc
+from test_data_analysis.tesla_half_cell import data_reader
+from test_data_analysis.ica_analysis import ica_on_arb_data
+from test_data_analysis.tesla_data_plot import look_up_fce_nrc
 import natsort
 import matplotlib as mpl
 import datetime as dt

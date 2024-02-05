@@ -6,7 +6,7 @@ import numpy as np
 from scipy.signal import savgol_filter
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal.windows import gaussian
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 import os
 # plt.rcParams['axes.grid'] = True
 #plt.style.use('chalmers_kf')

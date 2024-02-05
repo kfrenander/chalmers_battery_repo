@@ -1,6 +1,6 @@
-from PythonScripts.rpt_data_analysis.ReadRptClass import OrganiseRpts, look_up_fce
+from rpt_data_analysis.ReadRptClass import OrganiseRpts, look_up_fce
 from bda_data_plots import yield_dataset, find_peak_coords
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pandas as pd

@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from PythonScripts.test_data_analysis.BasePecDataClass import BasePecData, BasePecRpt, find_step_characteristics
+from test_data_analysis.BasePecDataClass import BasePecData, BasePecRpt, find_step_characteristics
 import os
 
 

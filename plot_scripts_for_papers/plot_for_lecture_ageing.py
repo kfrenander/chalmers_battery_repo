@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from PythonScripts.rpt_data_analysis.ReadRptClass import OrganiseRpts
-from PythonScripts.test_data_analysis.ica_analysis import gaussianfilterint, remove_faulty_points
-from PythonScripts.plot_scripts_for_papers.aline_tesla_plots_anastasiia import build_df_from_tmp_dict
+from rpt_data_analysis.ReadRptClass import OrganiseRpts
+from test_data_analysis.ica_analysis import gaussianfilterint, remove_faulty_points
+from plot_scripts_for_papers.aline_tesla_plots_anastasiia import build_df_from_tmp_dict
 import datetime as dt
 import scipy.constants
 import os

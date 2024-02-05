@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import re
-from PythonScripts.misc_classes.PopulationParameterEstimation import PopulationParameterEstimator as pp_itm
+from misc_classes.PopulationParameterEstimation import PopulationParameterEstimator as pp_itm
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter

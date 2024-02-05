@@ -1,13 +1,13 @@
 import sys
 sys.path.append(r'C:\battery-model\PythonScripts')
-from PythonScripts.test_data_analysis.BaseNewareDataClass import BaseNewareDataSet, BaseNewareData, BaseRptData
+from test_data_analysis.BaseNewareDataClass import BaseNewareDataSet, BaseNewareData, BaseRptData
 import os
 import re
 import pandas as pd
 import datetime as dt
 from natsort.natsort import natsorted
 import numpy as np
-from PythonScripts.test_data_analysis.rpt_analysis import characterise_steps
+from test_data_analysis.rpt_analysis import characterise_steps
 from multiprocessing import Pool
 import pickle
 

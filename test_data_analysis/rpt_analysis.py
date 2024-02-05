@@ -1,7 +1,7 @@
-from PythonScripts.test_data_analysis.read_neware_file import read_neware_xls
-from PythonScripts.test_data_analysis.capacity_test_analysis import find_cap_meas
-from PythonScripts.test_data_analysis.ica_analysis import find_ica_step, calc_ica_dva, large_span_ica_dva, simplified_ica_dva
-from PythonScripts.test_data_analysis.basic_plotting import dva_plot, ica_plot, cap_v_volt_multicolor
+from test_data_analysis.read_neware_file import read_neware_xls
+from test_data_analysis.capacity_test_analysis import find_cap_meas
+from test_data_analysis.ica_analysis import find_ica_step, calc_ica_dva, large_span_ica_dva, simplified_ica_dva
+from test_data_analysis.basic_plotting import dva_plot, ica_plot, cap_v_volt_multicolor
 from scipy.signal import savgol_filter
 import pandas as pd
 import matplotlib.pyplot as plt

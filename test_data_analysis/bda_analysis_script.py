@@ -2,13 +2,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.ticker import FormatStrFormatter
 import numpy as np
-from PythonScripts.rpt_data_analysis.ReadRptClass import OrganiseRpts
+from rpt_data_analysis.ReadRptClass import OrganiseRpts
 import re
 import os
 import matplotlib as mpl
 from PIL import Image
 from io import BytesIO
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 import natsort
 plt.style.use('chalmers_kf')
 # import statsmodels.api as sm

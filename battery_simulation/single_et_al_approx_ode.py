@@ -10,7 +10,7 @@ import re
 import os
 import datetime as dt
 import pandas as pd
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 plt.rcParams['axes.grid'] = True
 mpl.rcParams['xtick.labelsize'] = 16
 mpl.rcParams['ytick.labelsize'] = 16

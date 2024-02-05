@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
-from PythonScripts.rpt_data_analysis.ReadRptClass import OrganiseRpts
-from PythonScripts.test_data_analysis.ica_analysis import gaussianfilterint, remove_faulty_points
+from rpt_data_analysis.ReadRptClass import OrganiseRpts
+from test_data_analysis.ica_analysis import gaussianfilterint, remove_faulty_points
 import datetime as dt
 import os
 

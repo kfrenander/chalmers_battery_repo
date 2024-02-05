@@ -6,7 +6,7 @@ import datetime as dt
 import numpy as np
 import re
 from natsort.natsort import natsorted
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 import os
 
 
@@ -78,7 +78,7 @@ class NewareDataSet(object):
 class NewareData(object):
 
     def __init__(self, list_of_files, n_cores=8):
-        from PythonScripts.test_data_analysis.rpt_analysis import characterise_steps
+        from test_data_analysis.rpt_analysis import characterise_steps
         from multiprocessing import Pool
         import pickle
         self.file_names = list_of_files

@@ -3,12 +3,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.integrate import cumtrapz
-from PythonScripts.test_data_analysis.tesla_half_cell import gaussianfilterint
-from PythonScripts.test_data_analysis.BaseNewareDataClass import BaseNewareData as bnd
-from PythonScripts.test_data_analysis.ica_analysis import ica_on_arb_data
+from test_data_analysis.tesla_half_cell import gaussianfilterint
+from test_data_analysis.BaseNewareDataClass import BaseNewareData as bnd
+from test_data_analysis.ica_analysis import ica_on_arb_data
 import matplotlib as mpl
 import os
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 from scipy.io import savemat
 plt.rcParams['axes.grid'] = True
 mpl.rcParams['xtick.labelsize'] = 12

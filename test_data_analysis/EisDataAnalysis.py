@@ -7,11 +7,11 @@ import re
 from matplotlib import cm
 import matplotlib as mpl
 from scipy.signal import find_peaks
-from PythonScripts.rpt_data_analysis.ReadRptClass import look_up_fce
+from rpt_data_analysis.ReadRptClass import look_up_fce
 from matplotlib.offsetbox import AnchoredText
 from scipy.interpolate import interp1d
 import scipy.constants
-from PythonScripts.backend_fix import fix_mpl_backend
+from backend_fix import fix_mpl_backend
 from scipy.signal import argrelextrema
 import schemdraw
 import schemdraw.elements as elm
