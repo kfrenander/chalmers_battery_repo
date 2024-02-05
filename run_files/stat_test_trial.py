@@ -123,66 +123,81 @@ def calc_t_stat(d1, d2):
     t_stat = dm / (sd / np.sqrt(n))
     return t_stat
 
+if __name__ == '__main__':
+    import time
+    start = time.time()
+    data_files = {
+        "Test D": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test2_2.pkl",
+        "Test A": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test1_1.pkl",
+        "Test B": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test1_2.pkl",
+        "Test C": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test2_1.pkl"
+    }
+    data_files = sort_dict(data_files)
+    base_dir = r"Z:\StatisticalTest\figures_new_test_names"
+    savefig = 0
 
-data_files = {
-    "Test D": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test2_2.pkl",
-    "Test A": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test1_1.pkl",
-    "Test B": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test1_2.pkl",
-    "Test C": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test2_1.pkl"
-}
-data_files = sort_dict(data_files)
-base_dir = r"Z:\StatisticalTest\figures_new_test_names"
-savefig = 0
+    dta = {}
+    for k, val in data_files.items():
+        with open(val, 'rb') as f:
+            dta[k] = pickle.load(f)
 
-dta = {}
-for k, val in data_files.items():
-    with open(val, 'rb') as f:
-        dta[k] = pickle.load(f)
+    cmb_dct = extract_combinations(dta['Test A'])
+    ex_data1 = retrieve_samples(dta['Test A'], rpt_nbr=4, test_set=cmb_dct[3][0])
+    ex_data2 = retrieve_samples(dta['Test B'], rpt_nbr=4, test_set=cmb_dct[3][0])
+    p_anova = perform_stat_test(ex_data1, ex_data2, method='anova')
+    p_ttest = perform_stat_test(ex_data1, ex_data2, method='ttest')
+    print('Data read in complete...')
+    print('Starting statistical testing')
+    p_fail_ttest_rel, ref_prob_ttest_rel = perform_full_stat_test(dta, method='ttest')
+    print('ttest_rel done...')
+    p_fail_ttest_ind, ref_prob_ttest_ind = perform_full_stat_test(dta, method='ttest_ind')
+    print('ttest_ind done...')
+    p_fail_anova, ref_prob_anova = perform_full_stat_test(dta, method='anova')
+    print('ANOVA done...')
 
-cmb_dct = extract_combinations(dta['Test A'])
-ex_data1 = retrieve_samples(dta['Test A'], rpt_nbr=4, test_set=cmb_dct[3][0])
-ex_data2 = retrieve_samples(dta['Test B'], rpt_nbr=4, test_set=cmb_dct[3][0])
-p_anova = perform_stat_test(ex_data1, ex_data2, method='anova')
-p_ttest = perform_stat_test(ex_data1, ex_data2, method='ttest')
+    # CHECK NORMALITY OF DATA WITH QQ-PLOT ON EACH RPT
+    x_w = 3.25
+    y_w = 3.25
+    for cs, df in dta.items():
+        n = df.shape[0]
+        ncols = 3
+        nrows = int(np.ceil(n / ncols))
+        # fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(ncols*x_w, nrows*y_w))
+        fig = plt.figure(figsize=(ncols*x_w, nrows*y_w))
+        for k, rp in enumerate(df.filter(like='cap').index):
+            plt_ax = fig.add_subplot(nrows, ncols, k + 1)
+            data = df.filter(like='cap').loc[rp, :]
+            stats.probplot(data, dist='norm', plot=plt, rvalue=True)
+            # plt_ax.set_ylabel(plt_ax.get_ylabel(), fontsize=12)
+            # plt_ax.set_xlabel(plt_ax.get_xlabel(), fontsize=12)
+            plt_ax.set_xlabel('')
+            plt_ax.set_ylabel('')
+            plt_ax.set_title(rp, fontsize=12)
+            print(stats.kstest(data, stats.norm.cdf).pvalue)
+        fig.supxlabel('Theoretical Quantiles', fontsize=16)
+        fig.supylabel('Ordered values', fontsize=16)
+        fig.tight_layout()
+        if savefig:
+            fig.savefig(os.path.join(base_dir, cs, f'qq_plot_{cs}.png'), dpi=400)
 
-p_fail_ttest_rel, ref_prob_ttest_rel = perform_full_stat_test(dta, method='ttest')
-p_fail_ttest_ind, ref_prob_ttest_ind = perform_full_stat_test(dta, method='ttest_ind')
-p_fail_anova, ref_prob_anova = perform_full_stat_test(dta, method='anova')
-
-# CHECK NORMALITY OF DATA WITH QQ-PLOT ON EACH RPT
-x_w = 3.25
-y_w = 3.25
-for cs, df in dta.items():
-    n = df.shape[0]
-    ncols = 3
-    nrows = int(np.ceil(n / ncols))
-    # fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(ncols*x_w, nrows*y_w))
-    fig = plt.figure(figsize=(ncols*x_w, nrows*y_w))
-    for k, rp in enumerate(df.filter(like='cap').index):
-        plt_ax = fig.add_subplot(nrows, ncols, k + 1)
-        data = df.filter(like='cap').loc[rp, :]
-        stats.probplot(data, dist='norm', plot=plt, rvalue=True)
-        # plt_ax.set_ylabel(plt_ax.get_ylabel(), fontsize=12)
-        # plt_ax.set_xlabel(plt_ax.get_xlabel(), fontsize=12)
-        plt_ax.set_xlabel('')
-        plt_ax.set_ylabel('')
-        plt_ax.set_title(rp, fontsize=12)
-        print(stats.kstest(data, stats.norm.cdf).pvalue)
-    fig.supxlabel('Theoretical Quantiles', fontsize=16)
-    fig.supylabel('Ordered values', fontsize=16)
-    fig.tight_layout()
-    if savefig:
-        fig.savefig(os.path.join(base_dir, cs, f'qq_plot_{cs}.png'), dpi=400)
-
-# CHECK HOMOGENOUS VARIANCE BETWEEN TESTS
-rpt_comp = {f'rpt_{k}': {nm: dta[nm].filter(like='cap').loc[f'rpt_{k}', :] for nm in dta.keys()}
-                for k in range(2, 8)}
-b_fig = box_plot_on_data_dct(rpt_comp)
+    # CHECK HOMOGENOUS VARIANCE BETWEEN TESTS
+    rpt_comp = {f'rpt_{k}': {nm: dta[nm].filter(like='cap').loc[f'rpt_{k}', :] for nm in dta.keys()}
+                    for k in range(2, 8)}
+    b_fig = box_plot_on_data_dct(rpt_comp)
 
 
-# PLOT PROBABILITIES OF FALSE CONCLUSIONS FOR TWO TYPES OF T-TEST
-p_fig_ttest_rel = plot_p_fail(p_fail_ttest_rel)
-p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prob_ttest_rel.png'), dpi=400)
+    # PLOT PROBABILITIES OF FALSE CONCLUSIONS FOR TWO TYPES OF T-TEST
+    p_fig_ttest_rel = plot_p_fail(p_fail_ttest_rel)
+    p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prob_ttest_rel.png'), dpi=400)
+    p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prob_ttest_rel.pdf'))
 
-p_fig_ttest_ind = plot_p_fail(p_fail_ttest_ind)
-p_fig_ttest_ind.savefig(os.path.join(base_dir, f'fail_prob_ttest_ind.png'), dpi=400)
+    p_fig_ttest_ind = plot_p_fail(p_fail_ttest_ind)
+    p_fig_ttest_ind.savefig(os.path.join(base_dir, f'fail_prob_ttest_ind.png'), dpi=400)
+    p_fig_ttest_ind.savefig(os.path.join(base_dir, f'fail_prob_ttest_ind.pdf'))
+
+    p_fig_anova = plot_p_fail(p_fail_ttest_ind)
+    p_fig_anova.savefig(os.path.join(base_dir, f'fail_prob_anova.png'), dpi=400)
+    p_fig_anova.savefig(os.path.join(base_dir, f'fail_prob_anova.pdf'))
+
+    end = time.time()
+    print(f'Total time elapsed is {(end - start)/60:.2f} min')
