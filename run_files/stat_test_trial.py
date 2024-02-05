@@ -2,7 +2,7 @@ import pickle
 import matplotlib.pyplot as plt
 import os
 from plot_scripts_for_papers.stat_article_plot import (extract_combinations, retrieve_samples,
-                                                                     make_comb_set, box_plot_on_data_dct, fail_prob_plot)
+                                                       make_comb_set, box_plot_on_data_dct, fail_prob_plot)
 from scipy import stats
 import numpy as np
 import pandas as pd
@@ -17,15 +17,15 @@ def plot_p_fail(p_fail_dct):
     char_list = list(map(chr, range(ord('a'), ord('z') + 1)))
     n_rows, n_cols = 3, 2
     plt_num = 1
-    fig = plt.figure(figsize=(n_cols * x_width, n_rows * y_width))
-    for k, p_df in sort_dict(p_fail_dct).items():
+    p_fig = plt.figure(figsize=(n_cols * x_width, n_rows * y_width))
+    for k_df, p_df in sort_dict(p_fail_dct).items():
         # p_fail_, pax = plt.subplots(1, 1)
         # pax = fail_prob_plot(pax, p_df)
-        tmp_ax = fig.add_subplot(n_rows, n_cols, plt_num)
+        tmp_ax = p_fig.add_subplot(n_rows, n_cols, plt_num)
         tmp_ax = fail_prob_plot(tmp_ax, p_df)
         tmp_ax.set_ylabel('')
         tmp_ax.set_xlabel('')
-        plt_lbl = f'({char_list[plt_num - 1]}) {fix_title(k)}'
+        plt_lbl = f'({char_list[plt_num - 1]}) {fix_title(k_df)}'
         plt_num += 1
         # pax.set_title(fix_title(k), fontsize=11)
         # tmp_ax.set_title(fix_title(k), fontsize=11)
@@ -36,38 +36,38 @@ def plot_p_fail(p_fail_dct):
         # p_fail_.savefig(os.path.join(fig_op_dir, f'{k[0]}_and_{k[1]}.png'), dpi=400)
     # sub_fig_p = set_font_sizes(sub_fig_p, 12)
     # sub_fig_p.suptitle('Real Data', fontsize=15)
-    fig.supxlabel('Number of replicates used', fontsize=14)
-    fig.supylabel('Probability of false prediction', fontsize=14)
-    fig.tight_layout()
-    return fig
+    p_fig.supxlabel('Number of replicates used', fontsize=14)
+    p_fig.supylabel('Probability of false prediction', fontsize=14)
+    p_fig.tight_layout()
+    return p_fig
 
 
 def sort_dict(dct):
     my_keys = list(dct.keys())
     my_keys.sort()
-    return {k: dct[k] for k in my_keys}
+    return {k_dct: dct[k_dct] for k_dct in my_keys}
 
 
-def fix_title(k):
-    return f'{k[0]} with {k[1]}'
+def fix_title(k_):
+    return f'{k_[0]} with {k_[1]}'
 
 
-def pass_fail_stat_test(val, threshold=0.01):
-    if val >= threshold:
+def pass_fail_stat_test(p_val, threshold=0.01):
+    if p_val >= threshold:
         return 0
     else:
         return 1
 
 
-def pass_fail_pt_estim(val, ref):
-    if val == ref:
+def pass_fail_pt_estim(val_, ref):
+    if val_ == ref:
         return 1
     else:
         return 0
 
 
 def perform_full_stat_test(cap_dct, method='ttest'):
-    list_of_test_combinations = [k for k in combinations(cap_dct.keys(), 2)]
+    list_of_test_combinations = [k_iter for k_iter in combinations(cap_dct.keys(), 2)]
     dct_of_likelihoods = {}
     dct_of_ref_probs = {}
     for cmb in list_of_test_combinations:
@@ -107,21 +107,25 @@ def perform_stat_test(dset1, dset2, method='ttest'):
     elif method == 'ttest_ind':
         # Method chosen is Student's t-test
         _, p = stats.ttest_ind(dset1, dset2)
+    else:
+        print('Not recognised method, return \'None\'')
+        p = None
     return p
 
 
-def calc_group_var(data):
-    n = data.shape[0]
-    return np.sum((data - data.mean())**2) / (n - 1)
+def calc_group_var(data_set):
+    n_set = data_set.shape[0]
+    return np.sum((data_set - data_set.mean()) ** 2) / (n_set - 1)
 
 
 def calc_t_stat(d1, d2):
     d = d1 - d2
-    n = d.shape[0]
+    n_data = d.shape[0]
     dm = d.mean()
     sd = np.sqrt(calc_group_var(d))
-    t_stat = dm / (sd / np.sqrt(n))
+    t_stat = dm / (sd / np.sqrt(n_data))
     return t_stat
+
 
 if __name__ == '__main__':
     import time
