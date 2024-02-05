@@ -147,6 +147,7 @@ p_ttest = perform_stat_test(ex_data1, ex_data2, method='ttest')
 
 p_fail_ttest_rel, ref_prob_ttest_rel = perform_full_stat_test(dta, method='ttest')
 p_fail_ttest_ind, ref_prob_ttest_ind = perform_full_stat_test(dta, method='ttest_ind')
+p_fail_anova, ref_prob_anova = perform_full_stat_test(dta, method='anova')
 
 # CHECK NORMALITY OF DATA WITH QQ-PLOT ON EACH RPT
 x_w = 3.25
@@ -181,7 +182,7 @@ b_fig = box_plot_on_data_dct(rpt_comp)
 
 # PLOT PROBABILITIES OF FALSE CONCLUSIONS FOR TWO TYPES OF T-TEST
 p_fig_ttest_rel = plot_p_fail(p_fail_ttest_rel)
-p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prop_ttest_rel.png'), dpi=400)
+p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prob_ttest_rel.png'), dpi=400)
 
 p_fig_ttest_ind = plot_p_fail(p_fail_ttest_ind)
-p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prop_ttest_ind.png'), dpi=400)
+p_fig_ttest_ind.savefig(os.path.join(base_dir, f'fail_prob_ttest_ind.png'), dpi=400)
