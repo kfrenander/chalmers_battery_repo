@@ -1,0 +1,21 @@
+name: chalmers_env
+channels:
+ - defaults
+ - conda-forge
+dependencies:
+ - python=3.8
+ - pandas
+ - scipy
+ - matplotlib
+ - xlrd
+ - openpyxl
+ - python-pptx
+ - conda-build
+ - asammdf
+ - pip 
+ - Pillow
+ - pip:
+    - pybamm
+    - lmfit
+    - impedance
+    - mendeleev
