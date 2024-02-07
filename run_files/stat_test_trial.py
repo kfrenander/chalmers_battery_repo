@@ -9,7 +9,7 @@ import pandas as pd
 from itertools import combinations
 
 
-def plot_p_fail(p_fail_dct):
+def plot_p_fail(p_fail_dct, lbl_case='fce'):
     # PLOT PROBABILITIES OF FALSE CONCLUSION WITH T-TEST
     x_width = 3.5
     aspect_rat = 3 / 4
@@ -29,9 +29,11 @@ def plot_p_fail(p_fail_dct):
         plt_num += 1
         # pax.set_title(fix_title(k), fontsize=11)
         # tmp_ax.set_title(fix_title(k), fontsize=11)
-
+        if lbl_case == 'fce':
+            nw_lbl = [_update_label(l.get_label()) for l in tmp_ax.lines]
+            tmp_ax.legend([l for l in tmp_ax.lines], nw_lbl, fontsize=9)
         tmp_ax.set_ylim((0, 1))
-        tmp_ax.text(0.5, -0.2, plt_lbl, transform=tmp_ax.transAxes, fontsize=13,
+        tmp_ax.text(0.5, -0.22, plt_lbl, transform=tmp_ax.transAxes, fontsize=13,
                     horizontalalignment='center')
         # p_fail_.savefig(os.path.join(fig_op_dir, f'{k[0]}_and_{k[1]}.png'), dpi=400)
     # sub_fig_p = set_font_sizes(sub_fig_p, 12)
@@ -50,6 +52,12 @@ def sort_dict(dct):
 
 def fix_title(k_):
     return f'{k_[0]} with {k_[1]}'
+
+
+def _update_label(rp_str):
+    nm, nbr = rp_str.split(" ")
+    fce_ = (int(nbr) - 1) * 40
+    return f'FCE {fce_:.0f}'
 
 
 def pass_fail_stat_test(p_val, threshold=0.01):
@@ -192,16 +200,16 @@ if __name__ == '__main__':
 
     # PLOT PROBABILITIES OF FALSE CONCLUSIONS FOR TWO TYPES OF T-TEST
     p_fig_ttest_rel = plot_p_fail(p_fail_ttest_rel)
-    p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prob_ttest_rel.png'), dpi=400)
-    p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prob_ttest_rel.pdf'))
+    p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prob_ttest_rel_fce.png'), dpi=400)
+    p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prob_ttest_rel_fce.pdf'))
 
     p_fig_ttest_ind = plot_p_fail(p_fail_ttest_ind)
-    p_fig_ttest_ind.savefig(os.path.join(base_dir, f'fail_prob_ttest_ind.png'), dpi=400)
-    p_fig_ttest_ind.savefig(os.path.join(base_dir, f'fail_prob_ttest_ind.pdf'))
+    p_fig_ttest_ind.savefig(os.path.join(base_dir, f'fail_prob_ttest_ind_fce.png'), dpi=400)
+    p_fig_ttest_ind.savefig(os.path.join(base_dir, f'fail_prob_ttest_ind_fce.pdf'))
 
     p_fig_anova = plot_p_fail(p_fail_ttest_ind)
-    p_fig_anova.savefig(os.path.join(base_dir, f'fail_prob_anova.png'), dpi=400)
-    p_fig_anova.savefig(os.path.join(base_dir, f'fail_prob_anova.pdf'))
+    p_fig_anova.savefig(os.path.join(base_dir, f'fail_prob_anova_fce.png'), dpi=400)
+    p_fig_anova.savefig(os.path.join(base_dir, f'fail_prob_anova_fce.pdf'))
 
     end = time.time()
     print(f'Total time elapsed is {(end - start)/60:.2f} min')
