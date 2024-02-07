@@ -52,6 +52,8 @@ def make_data_set(inp_dct):
         tmp_df['FCE'] = [40 * (int(idx.split("_")[1]) - 1) for idx in tmp_df.index]
         tmp_df['Q_mean'] = tmp_df.filter(like='cap').mean(axis=1)
         tmp_df['Q_std'] = tmp_df.filter(like='cap').std(axis=1)
+        tmp_df['Q_loss_mean'] = 1 - tmp_df['Q_mean']
+        tmp_df['Q_rse'] = (tmp_df['Q_std'] / tmp_df['Q_loss_mean']).fillna(0)
         full_data_dct[t_name] = tmp_df
     return full_data_dct
 
