@@ -11,6 +11,7 @@ from itertools import combinations
 from scipy.stats import f_oneway, norm, zscore, ttest_rel
 import os
 from backend_fix import fix_mpl_backend
+import pickle
 fix_mpl_backend()
 my_style = 'kelly_colors'
 plt.style.use(my_style)
@@ -456,6 +457,8 @@ def main():
     test_subsets = {name_keys[nm]: {k: val.data for k, val in my_data.summary_dict.items() if nm in k} for nm in test_names}
     cap_data = make_data_set(test_subsets)
     cap_data = sort_dict(cap_data)
+    with open(r'\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\cap_dct.pkl', 'wb') as handle:
+        pickle.dump(cap_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
     ppe_dict = {k: ppe(df) for k, df in cap_data.items()}
     outlier_types = ['Random', 'Cell_Fault', 'Offset', 'Default']
     synth_cap_dct = {otlr: {k: gen_synth_data(df, outlier=otlr) for k, df in cap_data.items()} for otlr in outlier_types}
