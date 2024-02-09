@@ -1,5 +1,4 @@
 import sys
-sys.path.append(r'C:\battery-model\PythonScripts')
 from test_data_analysis.BaseNewareDataClass import BaseNewareDataSet, BaseNewareData, BaseRptData
 import os
 import re
@@ -113,9 +112,7 @@ class LgNewareData(BaseNewareData):
             '240046_2_8': 'Test2_2'
         }
         try:
-            if '240119' in self.unit_name:
-                return name_dict_aline[chan_key]
-            elif '240046' in self.unit_name:
+            if '240046' in self.unit_name:
                 return name_dict_stat[chan_key]
             elif '240095' in self.unit_name:
                 return name_dict_stat[chan_key]
@@ -141,23 +138,26 @@ class LgRptData(BaseRptData):
         i = 1
         for stp in self.char_dict[key].step_nbr:
             try:
-                ref_df =  self.char_dict[key][self.char_dict[key].step_nbr == stp - 2]
+                ref_df = self.char_dict[key][self.char_dict[key].step_nbr == stp - 2]
                 step_df = self.char_dict[key][self.char_dict[key].step_nbr == stp]
                 if (step_df['step_mode'][0] == 'CC_DChg' or step_df['step_mode'][0] == 'CC DChg') and ref_df['step_mode'][0] == 'CCCV_Chg':
                     if abs(step_df.curr[0] + 1.15) < 0.2 and step_df['maxV'][0] > 4 and step_df['minV'][0] < 3:
                         print('Cap is {:.2f} mAh'.format(step_df.cap[0]))
+                        tmp_cap_df = pd.DataFrame(data=step_df.cap.values, columns=['cap'], index=[f'cap_meas_{i}'])
+                        cap_df = pd.concat([cap_df, tmp_cap_df])
                         cap_df = cap_df.append(pd.DataFrame(data=step_df.cap.values, columns=['cap'],
                                                             index=['cap_meas_{}'.format(i)]))
                         i += 1
             except:
                 pass
         cap_df.loc['mean'] = cap_df.mean()
+        cap_df.loc['var_normed'] = cap_df.filter(like='cap_meas', axis=0).std(ddof=1) / cap_df.loc['mean']
         return cap_df
 
 
 if __name__ == '__main__':
     outer_tic = dt.datetime.now()
-    stat_test = r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\cycling_data"
+    stat_test = r"\\sol.ita.chalmers.se\groups\batt_lab_data\pulse_chrg_test\initial_rpt"
     test_case = LgNewareDataSet(stat_test)
     outer_toc = dt.datetime.now()
     print('Total elapsed time was {:.2f} min.'.format((outer_toc - outer_tic).total_seconds() / 60))

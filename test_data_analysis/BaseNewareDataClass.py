@@ -149,7 +149,7 @@ class BaseNewareData(object):
                            ['Rest', 'CC_Chg', 'CC_DChg', 'CCCV_Chg'], inplace=True)
         df['step_time'] = pd.to_timedelta(df.rel_time)
         df['abs_time'] = pd.to_datetime(df['abs_time'], format='%Y-%m-%d %H:%M:%S')
-        df['float_time'] = (df.abs_time - df.abs_time[0]).astype('timedelta64[s]')
+        df['float_time'] = (df.abs_time - df.abs_time[0]).dt.total_seconds().astype(float)
         try:
             df.loc[:, 'temperature'] = temperature_df.loc[:, 'temperature']
         except:
