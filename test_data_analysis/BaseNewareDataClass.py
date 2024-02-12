@@ -399,6 +399,12 @@ class BaseRptData(object):
             summary_df.index = [key for key in self.rpt_dict if self.rpt_dict]
         return summary_df
 
+    @staticmethod
+    def flatten_df(df):
+        s = df.stack()
+        df1 = pd.DataFrame([s.values], columns=[f'{j}-{i}' for i, j in s.index])
+        return df1
+
 
 if __name__ == '__main__':
     test_case = BaseNewareDataSet(r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\cycling_data")

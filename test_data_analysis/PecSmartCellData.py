@@ -78,15 +78,9 @@ class PecSmartCellRpt(BasePecRpt):
         date, q_mean, q_err = self.find_capacity_measurement(stp_info)
         FCE = self.find_fce(df)
         res_df = self.find_resistance_vals(df, stp_info)
-        flat_rdf = self.flatten_df(res_df)
+        flat_rdf = BasePecRpt.flatten_df(res_df)
         rpt_df = pd.DataFrame(data=[date, FCE, q_mean, q_err], index=['date', 'fce', 'cap', 'sig_cap']).T
         return pd.concat([rpt_df, flat_rdf], axis=1)
-
-    @staticmethod
-    def flatten_df(df):
-        s = df.stack()
-        df1 = pd.DataFrame([s.values], columns=[f'{j}-{i}' for i, j in s.index])
-        return df1
 
     def find_capacity_measurement(self, df):
         v_margin = 0.1

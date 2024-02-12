@@ -212,6 +212,12 @@ class BasePecRpt(object):
         self.step_info_dict = tmp_dct
         return None
 
+    @staticmethod
+    def flatten_df(df):
+        s = df.stack()
+        df1 = pd.DataFrame([s.values], columns=[f'{j}-{i}' for i, j in s.index])
+        return df1
+
 
 if __name__ == '__main__':
     test_case = r"\\sol.ita.chalmers.se\groups\batt_lab_data\smart_cell_JG\TestBatch2_autumn2023\Test2441_Cell-1.csv"
