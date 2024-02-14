@@ -45,12 +45,113 @@ def read_neware_xls(file_path, calc_c_rate=False):
     return df
 
 
+def _col_renamer(col_name):
+    neware_native = ['DataPoint',
+                     'Cycle Index',
+                     'Step Index',
+                     'Step Type',
+                     'Time',
+                     'Total Time',
+                     'Current(μA)',
+                     'Voltage(V)',
+                     'Capacity(mAh)',
+                     'Spec. Cap.(mAh/g)',
+                     'Chg. Cap.(mAh)',
+                     'Chg. Spec. Cap.(mAh/g)',
+                     'DChg. Cap.(mAh)',
+                     'DChg. Spec. Cap.(mAh/g)',
+                     'Energy(Wh)',
+                     'Spec. Energy(mWh/g)',
+                     'Chg. Energy(Wh)',
+                     'Chg. Spec. Energy(mWh/g)',
+                     'DChg. Energy(Wh)',
+                     'DChg. Spec. Energy(mWh/g)',
+                     'Date',
+                     'Power(W)',
+                     'dQ/dV(mAh/V)',
+                     'dQm/dV(mAh/V.g)',
+                     'Contact resistance(mΩ)',
+                     'Module start-stop switch'
+                     ]
+    local_names = ['measurement',
+                   'arb_step2',
+                   'arb_step1',
+                   'mode',
+                   'rel_time',
+                   'total_time',
+                   'curr',
+                   'volt',
+                   'cap',
+                   'spec_cap',
+                   'chrg_cap',
+                   'chrg_spec_cap',
+                   'dchg_cap',
+                   'dchg_spec_cap',
+                   'egy',
+                   'spec_egy',
+                   'chrg_egy',
+                   'chrg_spec_egy',
+                   'dchg_egy',
+                   'dchg_spec_egy',
+                   'abs_time',
+                   'power',
+                   'ica',
+                   'ica_spec',
+                   'contact_resistance',
+                   'module_strt_stop']
+    rename_dct = dict(zip(neware_native, local_names))
+    return rename_dct[col_name]
+
+
+def _find_curr_unit(col):
+    if '(μA)' in col:
+        return 'micro'
+    elif '(mA)' in col:
+        return 'milli'
+    elif '(A)' in col:
+        return 'SI'
+
+
+def _find_curr_col(df):
+    for c in df.columns:
+        if 'Current' in c:
+            curr_col = c
+    return curr_col
+
+
+def _scale_current(df, i_unit):
+    rdf = df.copy()
+    if i_unit == 'micro':
+        rdf.curr = rdf.curr / 1e6
+    elif i_unit == 'milli':
+        rdf.curr = rdf.curr / 1e3
+    else:
+        pass
+    return rdf
+
+
+def read_neware_80_xls(fname, curr_unit='milli'):
+    xl_ = pd.ExcelFile(fname)
+    df = xl_.parse('record')
+    c_col = _find_curr_col(df)
+    i_unit = _find_curr_unit(c_col)
+    df.columns = [_col_renamer(c) for c in df.columns]
+    df = _scale_current(df, i_unit)
+    df['step_time'] = pd.to_timedelta(df.rel_time)
+    df['abs_time'] = pd.to_datetime(df['abs_time'], format='%Y-%m-%d %H:%M:%S')
+    df['float_time'] = (df.abs_time - df.abs_time[0]).astype('timedelta64[ms]')
+    df.loc[:, 'step_time_float'] = pd.to_timedelta(df.step_time).astype('timedelta64[ms]')
+    return df
+
+
 if __name__ == '__main__':
-    my_files = [r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-1-2818574078.xls",
-                r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-2-2818574077.xls",
-                r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-3-2818574078.xls"]
-    dfs = {
-        'tesla_pos': read_neware_xls(my_files[0], calc_c_rate=True),
-        'tesla_neg': read_neware_xls(my_files[1]),
-        'green_neg': read_neware_xls(my_files[2])
-    }
+    # my_files = [r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-1-2818574078.xls",
+    #             r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-2-2818574077.xls",
+    #             r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-3-2818574078.xls"]
+    # dfs = {
+    #     'tesla_pos': read_neware_xls(my_files[0], calc_c_rate=True),
+    #     'tesla_neg': read_neware_xls(my_files[1]),
+    #     'green_neg': read_neware_xls(my_files[2])
+    # }
+    test_file_v80 = r"\\sol.ita.chalmers.se\groups\batt_lab_data\HaliBatt\SiGr_Materials\240072-1-1-2818575898.xlsx"
+    df = read_neware_80_xls(test_file_v80)
