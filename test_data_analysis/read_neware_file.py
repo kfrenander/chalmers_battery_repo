@@ -137,10 +137,11 @@ def read_neware_80_xls(fname, curr_unit='milli'):
     i_unit = _find_curr_unit(c_col)
     df.columns = [_col_renamer(c) for c in df.columns]
     df = _scale_current(df, i_unit)
-    df['step_time'] = pd.to_timedelta(df.rel_time)
+    df['step_time'] = pd.to_timedelta(df.rel_time).astype('int64') / 1e9
     df['abs_time'] = pd.to_datetime(df['abs_time'], format='%Y-%m-%d %H:%M:%S')
-    df['float_time'] = (df.abs_time - df.abs_time[0]).astype('timedelta64[ms]')
+    df['float_time'] = pd.to_timedelta(df['total_time']).astype('int64') / 1e9
     df.loc[:, 'step_time_float'] = pd.to_timedelta(df.step_time).astype('timedelta64[ms]')
+    df.loc[:, 'mAh'] = cumtrapz(df.curr, df.float_time / 3.6, initial=0)
     return df
 
 
