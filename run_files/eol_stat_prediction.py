@@ -8,8 +8,10 @@ from pd2ppt import df_to_powerpoint, df_to_table
 from pptx import Presentation
 from scipy.stats import norm
 from matplotlib import font_manager
-fontProperties = {'family':'sans-serif','sans-serif':['Helvetica'],
-    'weight' : 'normal', 'size' : 12}
+fontProperties = {'family':'sans-serif',
+                  'sans-serif':['Helvetica'],
+                  'weight' : 'normal',
+                  'size' : 12}
 
 
 plt.rcParams.update({
@@ -26,8 +28,8 @@ for tc in test_cases:
     eol_pp = EndOfLifeProcessing(dataset)
 
     # OUTPUT FIGURES FOR HISTOGRAMS AND NORMAL FITS FOR ALL EOL ESTIMATIONS
-    update_figs = 0
-    shade_area = 1
+    update_figs = 1
+    shade_area = 0
     fig_dir = os.path.join(r"Z:\StatisticalTest\figures_new_test_names", f"{name_dict[tc]}")
     if update_figs:
         print('Updating figures')
@@ -35,9 +37,9 @@ for tc in test_cases:
             os.mkdir(fig_dir)
         for k in eol_pp.dataset.keys():
             fig, ax = plt.subplots(1, 1)
-            fig_name = os.path.join(fig_dir, f'norm_and_histogram_{k}.pdf')
+            fig_name = os.path.join(fig_dir, f'wb_min_and_histogram_{k}.pdf')
             ax = eol_pp._plot_histogram(ax, normal_bool=True, n_cases=k, col_oe=1)
-            ax = eol_pp._plot_norm_distribution(ax, n_cases=k)
+            ax = eol_pp._plot_wb_distribution(ax, n_cases=k)
             ax.set_xticks(ax.get_xticks(), labels=[f'{x:.0f}' for x in ax.get_xticks()])
             ax.set_yticks(ax.get_yticks(), labels=[f'{y:.3f}' for y in ax.get_yticks()])
             ax.text(0.05, 0.9, f'{name_dict[tc]}: {k.split("_")[0]} cells',
@@ -62,7 +64,7 @@ for tc in test_cases:
                         transform=ax.transAxes)
                 ax.fill_between(x[x > 1.05*eol_pp.ref_value], y[x > 1.05*eol_pp.ref_value], 0,
                                 color='orange', alpha=0.5)
-                fig_name = os.path.join(fig_dir, f'norm_and_histogram_{k}_with_shade_with_cdf.pdf')
+                fig_name = os.path.join(fig_dir, f'wb_min_and_histogram_{k}_without_shade_with_cdf.pdf')
             fig.savefig(fig_name, dpi=300)
         plt.close('all')
 

@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.stats import norm, bootstrap
+from scipy.stats import norm, bootstrap, weibull_min
 
 
 class EndOfLifeProcessing(object):
@@ -9,8 +9,10 @@ class EndOfLifeProcessing(object):
         self.dataset = d_set
         self.ref_value = self.id_ref_value()
         self.norm_dist_params = {k: norm.fit(arr) for k, arr in self.dataset.items()}
+        self.wb_min_dist_params = {k: weibull_min.fit(arr) for k, arr in self.dataset.items()}
         self.df_oe_risk_raw = self.fill_oe_risk_df_raw()
         self.df_oe_risk_norm = self.fill_oe_risk_df_norm()
+        self.df_ow_risk_wb = self.fill_oe_risk_df_wb_min()
 
     def id_ref_value(self):
         return self.dataset['8_test'][0]
@@ -38,6 +40,15 @@ class EndOfLifeProcessing(object):
                 df.loc[oe, k] = rsk
         return df
 
+    def fill_oe_risk_df_wb_min(self, oe_lvls=np.array([1.02, 1.05, 1.1])):
+        df = pd.DataFrame(index=oe_lvls, columns=self.dataset.keys())
+        for k, arr in self.wb_min_dist_params.items():
+            for oe in oe_lvls:
+                rsk = 1 - weibull_min.cdf(oe * self.ref_value, *arr)
+                # print(f'Risk for oe is {rsk} at oe={oe} and {k}')
+                df.loc[oe, k] = rsk
+        return df
+
     def find_btstrp_pp(self):
         btstrp_data = {k: (data, ) for k, data in self.dataset.items() if '8' not in k}
         btstrp_std = {k: bootstrap(dta, np.std) for k, dta in btstrp_data.items()}
@@ -54,6 +65,20 @@ class EndOfLifeProcessing(object):
             for k, vals in self.norm_dist_params.items():
                 if k in n_cases:
                     ax.plot(t_rng, norm.pdf(t_rng, loc=vals[0], scale=vals[1]), label=k)
+        self._plot_oe_line(ax)
+        # ax.axvline(self.ref_value * 1.05, linestyle='dashed', color='forestgreen', label='Overestimation\nlimit - 5%')
+        return ax
+
+    def _plot_wb_distribution(self, ax, n_cases='all', shade_area=0):
+        w_case_loc, w_case_sig = self.norm_dist_params['2_test']
+        t_rng = np.linspace(w_case_loc - 3*w_case_sig, w_case_loc + 3*w_case_sig, 1000)
+        if n_cases == 'all':
+            for k, vals in self.wb_min_dist_params.items():
+                ax.plot(t_rng, weibull_min.pdf(t_rng, *vals), label=k)
+        else:
+            for k, vals in self.norm_dist_params.items():
+                if k in n_cases:
+                    ax.plot(t_rng, weibull_min.pdf(t_rng, *vals), label=k)
         self._plot_oe_line(ax)
         # ax.axvline(self.ref_value * 1.05, linestyle='dashed', color='forestgreen', label='Overestimation\nlimit - 5%')
         return ax
@@ -99,3 +124,5 @@ if __name__ == '__main__':
         ax.legend()
         fig2, ax2 = plt.subplots(1, 1)
         ax2 = test_._plot_histogram(ax2, col_oe=1)
+        fig_wb, ax_wb = plt.subplots(1, 1)
+        ax_wb = test_._plot_wb_distribution(ax_wb)
