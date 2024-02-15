@@ -19,7 +19,7 @@ def convert_mux_log_to_df(mux_log):
     df = convert_unix_time_columns_to_local_datetime(df, ['time1', 'time2'])
     for col in df.columns:
         if 'voltage' in col:
-            df[col] = filter_sudden_jumps(df[col], 2)
+            df[col] = filter_sudden_jumps(df[col], 0.5)
     return df
 
 
@@ -41,3 +41,4 @@ def filter_sudden_jumps_in_dataframe(df, threshold):
 if __name__ == '__main__':
     mux_log = r"\\sol.ita.chalmers.se\groups\eom-et-alla\Research\HaliBatt\SiGr_materials\CtrlMsmt\2024     2    14    11    22    29"
     df = convert_mux_log_to_df(mux_log)
+    df.filter(like='voltage').plot()
