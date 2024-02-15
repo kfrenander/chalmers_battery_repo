@@ -36,20 +36,20 @@ def find_step_characteristics(df):
 
 class BasePecData(object):
 
-    def __init__(self, fname):
+    def __init__(self, fname, data_init_row=24):
         self.rpt_dict = {}
         self.ici_dict = {}
         self.meta_data_dict = {}
         self.data_file = fname
-        self.data_init_row = 24
+        self.data_init_row = data_init_row
         self.test_nbr = self.find_test_nbr()
         self.col_name_dict = self.make_rename_column_dict()
         self.dyn_data = self.read_pec_file(fname)
         self.meta_data_dict = self.read_pec_metadata()
         self.dyn_data = self.fill_step_cap()
         self.step_info = find_step_characteristics(self.dyn_data)
-        self.find_all_rpt()
-        self.find_ici()
+        # self.find_all_rpt()
+        # self.find_ici()
 
     def find_test_nbr(self):
         return re.search(r'Test\d+', self.data_file).group()

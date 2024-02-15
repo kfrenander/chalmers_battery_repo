@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
-from test_data_analysis.BasePecDataClass import BasePecData, BasePecRpt, find_step_characteristics
+from test_data_analysis.BasePecDataClass import BasePecRpt, find_step_characteristics
+from test_data_analysis.pec_lifetest import PecLifeTestData
 import os
 
 
-class PecSmartCellData(BasePecData):
+class PecSmartCellData(PecLifeTestData):
 
     def __init__(self, fname, op_bool=0):
         super().__init__(fname)
