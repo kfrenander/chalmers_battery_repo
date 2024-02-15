@@ -1,8 +1,6 @@
 import pandas as pd
 import re
-import pandas.errors
 from scipy.integrate import cumtrapz
-import datetime as dt
 
 
 def find_step_characteristics(df):
@@ -55,30 +53,30 @@ class BasePecData(object):
         return re.search(r'Test\d+', self.data_file).group()
 
     def make_rename_column_dict(self):
-        orig_name_list =   ['Step',
-                            'Instruction Name',
-                            'Cycle',
-                            'Total Time (Seconds)',
-                            'Step Time (Seconds)',
-                            'Real Time',
-                            'Voltage (V)',
-                            'Current (A)',
-                            'Charge Capacity (mAh)',
-                            'Discharge Capacity (mAh)',
-                            'Charge Energy (mWh)',
-                            'Discharge Energy (mWh)',
-                            'CycNbrOuter [Var18]',
-                            'CycNbrRpt [Var19]',
-                            'RPT_fast_bool [Var20]',
-                            'RPT_comp_bool [Var21]',
-                            'TC_1 (°C)',
-                            'Unnamed: 16',
-                            'Unnamed: 17',
-                            'Unnamed: 18',
-                            'ICI_bool [Var22]',
-                            'Unnamed: 13',
-                            'LiPlating_bool [Var26]'
-                            ]
+        orig_name_list = ['Step',
+                          'Instruction Name',
+                          'Cycle',
+                          'Total Time (Seconds)',
+                          'Step Time (Seconds)',
+                          'Real Time',
+                          'Voltage (V)',
+                          'Current (A)',
+                          'Charge Capacity (mAh)',
+                          'Discharge Capacity (mAh)',
+                          'Charge Energy (mWh)',
+                          'Discharge Energy (mWh)',
+                          'CycNbrOuter [Var18]',
+                          'CycNbrRpt [Var19]',
+                          'RPT_fast_bool [Var20]',
+                          'RPT_comp_bool [Var21]',
+                          'TC_1 (°C)',
+                          'Unnamed: 16',
+                          'Unnamed: 17',
+                          'Unnamed: 18',
+                          'ICI_bool [Var22]',
+                          'Unnamed: 13',
+                          'LiPlating_bool [Var26]'
+                          ]
         new_name_list = ['step',
                          'instruction',
                          'cycle',
@@ -101,7 +99,8 @@ class BasePecData(object):
                          'unknown3',
                          'ici_bool',
                          'unknown4',
-                         'li_plating_bool']
+                         'li_plating_bool'
+                         ]
         name_update_dict = dict(zip(orig_name_list, new_name_list))
         return name_update_dict
 
@@ -128,7 +127,7 @@ class BasePecData(object):
             for cnt, line in enumerate(f):
                 if cnt < self.data_init_row:
                     ln_ = line.split(',')
-                    tmp_dct[ln_[0].strip()] = [l.strip() for l in ln_[1:]]
+                    tmp_dct[ln_[0].strip()] = [ln.strip() for ln in ln_[1:]]
                 else:
                     f.close()
                     break
@@ -159,7 +158,7 @@ class BasePecData(object):
 
     @staticmethod
     def calc_step_egy(group):
-        group['step_egy'] = cumtrapz(group.curr*group.volt, group.step_time, initial=0) / 3.6
+        group['step_egy'] = cumtrapz(group.curr * group.volt, group.step_time, initial=0) / 3.6
         return group
 
     def fill_step_cap(self):
@@ -167,34 +166,6 @@ class BasePecData(object):
 
     def fill_step_egy(self):
         return self.dyn_data.groupby(by='unq_step', group_keys=False).apply(self.calc_step_egy)
-
-    def find_all_rpt(self):
-        fast_rpt_dict = self.find_rpt(rpt_type='fast')
-        comp_rpt_dict = self.find_rpt(rpt_type='comp')
-        self.rpt_dict = {
-            'fast': fast_rpt_dict,
-            'comp': comp_rpt_dict
-        }
-        return None
-
-    def find_rpt(self, rpt_type):
-        if rpt_type == 'comp':
-            bool_col = 'rpt_comp_bool'
-        elif rpt_type == 'fast':
-            bool_col = 'rpt_fast_bool'
-        else:
-            print(f'No analysis possible for rpt key of \'{rpt_type}\'. Ending.')
-            return None
-        rpt_df = self.dyn_data[self.dyn_data[bool_col] == 1]
-        gb = rpt_df.groupby(by='CycNbrOuter')
-        rpt_dict = {k: gb.get_group(k) for k in gb.groups if gb.get_group(k).shape[0] > 100}
-        return rpt_dict
-
-    def find_ici(self):
-        ici_df = self.dyn_data[self.dyn_data['ici_bool'] == 1]
-        gb = ici_df.groupby(by='CycNbrOuter')
-        self.ici_dict = {k: gb.get_group(k) for k in gb.groups}
-        return None
 
 
 class BasePecRpt(object):
