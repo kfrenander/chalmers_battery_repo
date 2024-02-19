@@ -9,7 +9,9 @@ def find_data_init_row(file_string):
         for cnt, line in enumerate(readfile):
             if 'END RESULTS CHECK' in line:
                 init_line = cnt
-            else:
+                readfile.close()
+                break
+            elif cnt > 300:
                 readfile.close()
                 break
     try:
