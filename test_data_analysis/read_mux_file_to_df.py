@@ -33,11 +33,6 @@ def filter_sudden_jumps(series, threshold):
     return series[filtered_indices]
 
 
-def filter_sudden_jumps_in_dataframe(df, threshold):
-    filtered_df = df.apply(lambda x: filter_sudden_jumps(x, threshold), axis=0)
-    return filtered_df
-
-
 if __name__ == '__main__':
     mux_log = r"\\sol.ita.chalmers.se\groups\eom-et-alla\Research\HaliBatt\SiGr_materials\CtrlMsmt\2024     2    14    11    22    29"
     df = convert_mux_log_to_df(mux_log)
