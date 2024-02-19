@@ -3,7 +3,7 @@ import pandas as pd
 
 
 def unix_time_to_local_datetime(unix_time):
-    return datetime.fromtimestamp(unix_time / 1e3)
+    return datetime.utcfromtimestamp(unix_time / 1e3)
 
 
 def convert_unix_time_columns_to_local_datetime(df, unix_time_columns):
