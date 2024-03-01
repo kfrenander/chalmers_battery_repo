@@ -72,8 +72,13 @@ def _col_renamer(col_name):
                      'dQ/dV(mAh/V)',
                      'dQm/dV(mAh/V.g)',
                      'Contact resistance(mΩ)',
-                     'Module start-stop switch'
-                     ]
+                     'Module start-stop switch',
+                     'V1',
+                     'V2',
+                     'Aux. ΔV',
+                     'T1',
+                     'T2',
+                     'Aux. ΔT']
     local_names = ['measurement',
                    'arb_step2',
                    'arb_step1',
@@ -100,7 +105,13 @@ def _col_renamer(col_name):
                    'ica',
                    'ica_spec',
                    'contact_resistance',
-                   'module_strt_stop']
+                   'module_strt_stop',
+                   'aux_volt_1',
+                   'aux_volt_2',
+                   'aux_dv',
+                   'aux_T_1',
+                   'aux_T_2',
+                   'aux_dT']
     rename_dct = dict(zip(neware_native, local_names))
     return rename_dct[col_name]
 
@@ -132,9 +143,40 @@ def _scale_current(df, i_unit):
     return rdf
 
 
+def find_initial_data_row(df):
+    # Find the row where the time-resolved data starts
+    metadata_rows = 0
+    for index, row in df.iterrows():
+        # Here you can add conditions to identify the end of metadata
+        # For example: If a specific column contains NaN values
+        if pd.isna(row).any():
+            metadata_rows += 1
+        else:
+            break
+    return metadata_rows + 1
+
+
+def find_aux_channels(xl):
+    aux_channels = [sh_name for sh_name in xl.sheet_names if 'aux' in sh_name]
+    return aux_channels
+
+
+def parse_aux_channel(xl, sheet):
+    df_tmp = xl.parse(sheet)
+    FIRST_DATA = find_initial_data_row(df_tmp)
+    aux_df = xl.parse(sheet, header=FIRST_DATA)
+    # aux_df = aux_df.loc[:, (aux_df != 0).any(axis=0)]
+    return aux_df
+
+
 def read_neware_80_xls(fname, curr_unit='milli'):
     xl_ = pd.ExcelFile(fname)
     df = xl_.parse('record')
+    aux_ch = find_aux_channels(xl_)
+    aux_ch_df_dct = {k: parse_aux_channel(xl_, k) for k in aux_ch}
+    for k, aux_df in aux_ch_df_dct.items():
+        shared_cols = list(set(df.columns) & set(aux_df.columns))
+        df = pd.merge(df, aux_df, on=shared_cols)
     c_col = _find_curr_col(df)
     i_unit = _find_curr_unit(c_col)
     df.columns = [_col_renamer(c) for c in df.columns]
