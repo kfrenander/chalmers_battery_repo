@@ -1,5 +1,5 @@
 import datetime
-from pyvisa_interface.pyvisa_interface import MeasurementDevice
+from pyvisa_interface.pyvisa_device import MeasurementDevice
 from pyvisa_interface.prompt_user_input import choice_handler_msmt_setting, choice_handler_device_setting
 import pyvisa
 import time
