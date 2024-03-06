@@ -34,6 +34,19 @@ def convert_mux_log_to_df(mux_log):
     return df
 
 
+def convert_individual_mux_log_to_df(file_name):
+    df = pd.read_csv(file_name, names=['time1', 'voltage1'])
+    if mux_log.endswith('.csv'):
+        local_time = True
+    else:
+        local_time = False
+    df = convert_unix_time_columns_to_local_datetime(df, ['time1'], local_time=local_time)
+    for col in df.columns:
+        if 'voltage' in col:
+            df[col] = filter_sudden_jumps(df[col], 0.5)
+    return df
+
+
 def filter_sudden_jumps(series, threshold):
     filtered_indices = [True]  # Assume the first data point is not a jump
     for i in range(1, len(series)):
@@ -44,10 +57,21 @@ def filter_sudden_jumps(series, threshold):
     return series[filtered_indices]
 
 
+def read_mux_log(file_path):
+    csv_sample = pd.read_csv(file_path, nrows=3)
+    num_columns = len(csv_sample.columns)
+    if num_columns == 4:
+        return convert_mux_log_to_df(file_path)
+    elif num_columns == 2:
+        return convert_individual_mux_log_to_df(file_path)
+
+
 if __name__ == '__main__':
     mux_log = r"\\sol.ita.chalmers.se\groups\eom-et-alla\Research\HaliBatt\SiGr_materials\CtrlMsmt\2024     2    14    11    22    29"
     csv_log = r"\\sol.ita.chalmers.se\groups\eom-et-alla\Research\HaliBatt\SiGr_materials\ICI_msmt\voltage_data_2024-02-27_12_07_18_984.csv"
-    df = convert_mux_log_to_df(mux_log)
+    csv_individual_log = r"\\sol.ita.chalmers.se\groups\eom-et-alla\Research\HaliBatt\SiGr_materials\ICI_msmt\voltage_data_device25_2024-03-06_14_27_08_747.csv"
+    df = read_mux_log(mux_log)
     df.filter(like='voltage').plot()
-    df_python = convert_mux_log_to_df(csv_log)
+    df_python = read_mux_log(csv_log)
     df_python.filter(like='voltage').plot()
+    df_indvdl = read_mux_log(csv_individual_log)
