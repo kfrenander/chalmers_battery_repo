@@ -12,6 +12,10 @@ class ElectrodeMaterial(object):
         A = np.pi * (d / 2)**2  # Should be in cm^2
         return A * self.area_cap
 
+    def calc_coin_cell_wt(self, d):
+        A = np.pi * (d / 2)**2
+        return A * self.coat_wt
+
     def calc_pouch_cell_cap(self, A):
         return A * self.area_cap
 
@@ -25,5 +29,6 @@ if __name__ == '__main__':
     nm_list = ['nmc', 'gr', 'si05', 'si10', 'si15']
     el_dct = dict(zip(nm_list, [nmc811, gr, sigr05, sigr10, sigr15]))
     cap_dct = {k: el.calc_coin_cell_cap(1.8) for k, el in el_dct.items()}
+    wt_dct = {k: el.calc_coin_cell_wt(1.8) for k, el in el_dct.items()}
     c_rates = {f'c_by{c}': cap_dct['nmc'] / c for c in [1, 5, 10, 20]}
 
