@@ -96,6 +96,7 @@ class NIDAQmxManager:
                             readings_dict[ai_physical_channel.name] = None
                         except:
                             print(f'No reading for {ai_physical_channel}')
+                task.timing.cfg_samp_clk_timing(rate=1000, sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
                 data = np.array(task.read(number_of_samples_per_channel=num_readings))
             for nm, dta in zip(readings_dict.keys(), np.mean(data, axis=1)):
                 readings_dict[nm] = dta
@@ -103,12 +104,14 @@ class NIDAQmxManager:
             print("No NI-DAQmx devices found.")
         return readings_dict
 
-    def check_reasonable_readings(self, threshold=0, num_readings=10):
+    def check_reasonable_readings(self, threshold=0., num_readings=10):
         chnl_readout = self.take_channel_readings(num_readings=num_readings)
         reasonable_channels = []
         for k, val in chnl_readout.items():
             if val > threshold:
                 reasonable_channels.append(k)
+                print(f"  - Channel: {k} passed to logging.")
+        print(f"A total of {len(reasonable_channels)} channels show reasonable data and will be logged.")
         return reasonable_channels
 
     def store_device_information(self, device_output_filename):
@@ -188,11 +191,11 @@ class DataAcquisition:
 
     def average_data(self):
         try:
-            with open(self.settings.filename, 'w+', newline='') as csvfile:
+            with open(self.settings.filename, 'a+', newline='') as csvfile:
                 csv_writer = csv.writer(csvfile)
                 csv_writer.writerow(['time', *self.settings.channel_names])
 
-                data_accumulator = np.empty((2, 20000))
+                data_accumulator = np.empty((self.settings.nbr_of_channels, 20000))
 
                 while time.time() - self.start_time < self.settings.duration:
                     try:
@@ -207,22 +210,23 @@ class DataAcquisition:
                                                                                 self.settings.output_rate):
                         data_accumulator = data_accumulator[:, :len(data[0])]
                         filtered_data = np.mean(data_accumulator, axis=1)
-                        # timestamp = time.time()  # Get current time
-                        csv_writer.writerow([timestamp,
-                                             round(filtered_data[0], self.settings.nbr_of_digits),
-                                             round(filtered_data[1], self.settings.nbr_of_digits)])
+                        output_data_row = [timestamp]
+                        for val in filtered_data:
+                            output_data_row.append(round(val, self.settings.nbr_of_digits))
+                        csv_writer.writerow(output_data_row)
                         if timestamp - self.last_log_time >= 300:
                             ts_human_readable = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
                             self.display_latest_measurement(ts_human_readable, filtered_data)
                             self.last_log_time = timestamp
                             csvfile.flush()
-                        data_accumulator = np.empty((2, 20000))
+                        data_accumulator = np.empty((self.settings.nbr_of_channels, 20000))
         except KeyboardInterrupt:
             print('KeyboardInterrupt detected, exiting')
 
     @staticmethod
     def display_latest_measurement(timestamp, data):
-        print(f"Latest Measurement at {timestamp}: Voltage1={data[0]:.4f}, Voltage2={data[1]:.4f}")
+        formatted_data = [f'Voltage{n + 1}={val:.4f}' for n, val in enumerate(data)]
+        print(f"Latest Measurement at {timestamp}: {', '.join(formatted_data)}")
 
     def start_acquisition_and_averaging(self):
         try:
@@ -254,11 +258,11 @@ class Main:
         daq_mngr.list_available_device_types()
         daq_mngr.list_available_devices()
         daq_mngr.store_device_information(self.device_info_file)
-        channel_names = daq_mngr.check_reasonable_readings()
+        channel_names = daq_mngr.check_reasonable_readings(threshold=0.05)
         settings = DataAcquisitionSettings(channel_names=channel_names,
                                            sampling_rate=10000,
-                                           output_rate=1,
-                                           duration=4*3600,
+                                           output_rate=25,
+                                           duration=48*3600,
                                            output_file=self.measurement_settings_file,
                                            filename=self.data_file)
         acquisition = DataAcquisition(settings)
