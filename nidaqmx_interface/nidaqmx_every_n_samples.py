@@ -126,7 +126,10 @@ class NIDAQmxManager:
 
 
 class DataAcquisitionSettings:
-    def __init__(self, channel_names, sampling_rate, output_rate, duration, filename, output_file, nbr_of_digits=7):
+    def __init__(self, channel_names, sampling_rate, output_rate, duration, filename, output_file,
+                 nbr_of_digits=7,
+                 log_condition='default',
+                 log_threshold=0.):
         self.channel_names = channel_names
         self.nbr_of_channels = int(len(channel_names))
         self.sampling_rate = sampling_rate
@@ -136,6 +139,9 @@ class DataAcquisitionSettings:
         self.filename = filename
         self.output_file = output_file
         self.nbr_of_digits = nbr_of_digits
+        self.log_condition = log_condition
+        self.log_threshold = log_threshold
+        self.set_threshold()
 
     def to_json(self):
         settings_dict = {
@@ -143,10 +149,31 @@ class DataAcquisitionSettings:
             "sampling_rate": self.sampling_rate,
             "output_rate": self.output_rate,
             "duration": self.duration,
-            "filename": self.filename
+            "filename": self.filename,
+            "log_condition": self.log_condition
         }
         with open(self.output_file, "w") as json_file:
             json.dump(settings_dict, json_file, indent=4)
+
+    def set_threshold(self):
+        if self.log_condition == 'default' or self.log_condition == 'time':
+            print(f'Logging with mode {self.log_condition}')
+        else:
+            if self.log_threshold == 0:
+                self.log_threshold = self.prompt_user_for_threshold()
+            print(f'Logging with mode {self.log_condition} and trigger threshold {self.log_threshold * 1e3:.2f}mV')
+
+
+    def prompt_user_for_threshold(self):
+        while True:
+            try:
+                threshold = float(input("Please enter a threshold value (below 0.01): "))
+                if 0 <= threshold < 0.1:
+                    return threshold
+                else:
+                    print("Threshold must be a float value below 0.01. Please try again.")
+            except ValueError:
+                print("Invalid input. Please enter a valid float value.")
 
 
 class DataAcquisition:
@@ -157,6 +184,7 @@ class DataAcquisition:
         self.data = []
         self.start_time = time.time()
         self.last_log_time = 0
+        self.current_log_value = np.zeros(self.settings.nbr_of_channels)
 
     def acquire_data(self):
         try:
@@ -189,37 +217,57 @@ class DataAcquisition:
         except KeyboardInterrupt:
             print('KeyboardInterrupt detected, exiting')
 
+    def accumulate_data(self):
+        data_accumulator = np.empty((self.settings.nbr_of_channels, 20000))
+        try:
+            data = self.data_queue.get(timeout=0.5)
+            measurement_timestamp = self.time_queue.get(timeout=0.5)  # Non-blocking queue read with a timeout
+            data_accumulator[:, :len(data[0])] = data
+            data_accumulator = data_accumulator[:, :len(data[0])]
+            return measurement_timestamp, data_accumulator
+        except queue.Empty:
+            pass  # Continue if no data is available
+
+    def time_based_logging(self, ts, data, writer):
+        output_data_row = [ts]
+        for val in data:
+            output_data_row.append(round(val, self.settings.nbr_of_digits))
+        writer.writerow(output_data_row)
+
+    def voltage_based_logging(self, ts, data, writer):
+        d_v = abs(data - self.current_log_value)
+        if np.any(d_v > self.settings.log_threshold):
+            output_data_row = [ts]
+            for val in data:
+                output_data_row.append(round(val, self.settings.nbr_of_digits))
+            writer.writerow(output_data_row)
+            self.current_log_value = data
+
     def average_data(self):
         try:
             with open(self.settings.filename, 'a+', newline='') as csvfile:
                 csv_writer = csv.writer(csvfile)
                 csv_writer.writerow(['time', *self.settings.channel_names])
 
-                data_accumulator = np.empty((self.settings.nbr_of_channels, 20000))
+                # data_accumulator = np.empty((self.settings.nbr_of_channels, 20000))
 
                 while time.time() - self.start_time < self.settings.duration:
-                    try:
-                        data = self.data_queue.get(timeout=0.5)
-                        timestamp = self.time_queue.get(timeout=0.5)  # Non-blocking queue read with a timeout
-                    except queue.Empty:
-                        continue  # Continue if no data is available
-
-                    data_accumulator[:, :len(data[0])] = data
+                    timestamp, data_accumulator = self.accumulate_data()
                     samples_accumulated = np.count_nonzero(~np.isnan(data_accumulator))
                     if samples_accumulated >= self.settings.nbr_of_channels*int(self.settings.sampling_rate /
                                                                                 self.settings.output_rate):
-                        data_accumulator = data_accumulator[:, :len(data[0])]
+
                         filtered_data = np.mean(data_accumulator, axis=1)
-                        output_data_row = [timestamp]
-                        for val in filtered_data:
-                            output_data_row.append(round(val, self.settings.nbr_of_digits))
-                        csv_writer.writerow(output_data_row)
-                        if timestamp - self.last_log_time >= 300:
+                        if self.settings.log_condition == 'default' or self.settings.log_condition == 'time':
+                            self.time_based_logging(timestamp, filtered_data, csv_writer)
+                        else:
+                            self.voltage_based_logging(timestamp, filtered_data, csv_writer)
+
+                        if timestamp - self.last_log_time >= 10:
                             ts_human_readable = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
                             self.display_latest_measurement(ts_human_readable, filtered_data)
                             self.last_log_time = timestamp
                             csvfile.flush()
-                        data_accumulator = np.empty((self.settings.nbr_of_channels, 20000))
         except KeyboardInterrupt:
             print('KeyboardInterrupt detected, exiting')
 
@@ -246,7 +294,7 @@ class DataAcquisition:
 
 class Main:
     def __init__(self):
-        self.base_folder = r"E:\HaliBatt\nidaqmx_logs"
+        self.base_folder = r"E:\HaliBatt\SiGrThreeElectrode\cycling_data"
         self.output_folder = ''
         self.data_file = ''
         self.device_info_file = ''
@@ -264,7 +312,9 @@ class Main:
                                            output_rate=25,
                                            duration=48*3600,
                                            output_file=self.measurement_settings_file,
-                                           filename=self.data_file)
+                                           filename=self.data_file,
+                                           log_condition='voltage',
+                                           log_threshold=100e-6)
         acquisition = DataAcquisition(settings)
         acquisition.start_acquisition_and_averaging()
 
