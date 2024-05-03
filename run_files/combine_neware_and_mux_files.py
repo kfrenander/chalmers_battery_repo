@@ -57,12 +57,39 @@ def merge_neware_and_mux(fname_mux, fname_neware):
     return df_merged
 
 
+def merge_nidaq_and_neware(fname_nidaq, fname_neware, pe_col_name='', ne_col_name=''):
+    nidaq_df = pd.read_csv(fname_nidaq)
+    nidaq_df['nidaq_abs_time'] = pd.to_datetime(nidaq_df.time, unit='s', utc=True).dt.tz_convert('Europe/Stockholm')
+    neware_df = read_neware_80_xls(fname_neware)
+    neware_df['abs_time_tz'] = neware_df.abs_time.dt.tz_localize('Europe/Stockholm')
+    import_cols = []
+    for col in [pe_col_name, ne_col_name]:
+        if col:
+            import_cols.append(col)
+    df_merged = merge_data_with_time_stamp(neware_df, nidaq_df,
+                                           target_timestamp_col='abs_time_tz',
+                                           source_timestamp_col='nidaq_abs_time',
+                                           columns_to_import=import_cols)
+    df_merged.rename(columns={pe_col_name: 'aux_pos', ne_col_name: 'aux_neg'}, inplace=True)
+    return df_merged
+
+
 def main():
     import matplotlib.pyplot as plt
-    mux_log = r"\\sol.ita.chalmers.se\groups\eom-et-alla\Research\HaliBatt\SiGr_materials\CtrlMsmt\2024     2    14    11    22    29"
-    fname_neware = r"\\sol.ita.chalmers.se\groups\batt_lab_data\HaliBatt\SiGr_Materials\240072-1-1-2818575898.xlsx"
-    combined_df = merge_neware_and_mux(mux_log, fname_neware)
-    visual_inspection = 1
+    mux_log = (r"\\sol.ita.chalmers.se\groups\eom-et-alla\Research\HaliBatt\SiGr_materials\ICI_msmt\voltage_"
+               r"data_2024-02-27_12_07_18_984.csv")
+    fname_neware = (r"\\sol.ita.chalmers.se\groups\eom-et-alla\Research\HaliBatt\SiGr_materials\ICI"
+                    r"_msmt\240072-1-1-2818575915.xlsx")
+    fname_nidaq = (r"\\sol.ita.chalmers.se\groups\batt_lab_data\HaliBatt\SiGr_Materials\ICI_data"
+                   r"\log_data_2024-04-15_10-01-23\output_data.csv")
+    ici_neware_1 = (r"\\sol.ita.chalmers.se\groups\batt_lab_data\HaliBatt\SiGr_Materials\ICI_data"
+                    r"\240072-1-1-2818575938.xlsx")
+
+    # combined_df = merge_neware_and_mux(mux_log, fname_neware)
+    merged_df = merge_nidaq_and_neware(fname_nidaq, ici_neware_1,
+                                       pe_col_name='cDAQ1Mod2/ai0',
+                                       ne_col_name='cDAQ1Mod2/ai1')
+    visual_inspection = 0
     if visual_inspection:
         plt.plot(combined_df['abs_time'], combined_df['voltage1'], label='Neg electrode')
         plt.plot(combined_df['abs_time'], combined_df['voltage2'], label='Pos electrode')
