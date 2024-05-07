@@ -30,5 +30,5 @@ if __name__ == '__main__':
     el_dct = dict(zip(nm_list, [nmc811, gr, sigr05, sigr10, sigr15]))
     cap_dct = {k: el.calc_coin_cell_cap(1.8) for k, el in el_dct.items()}
     wt_dct = {k: el.calc_coin_cell_wt(1.8) for k, el in el_dct.items()}
-    c_rates = {f'c_by{c}': cap_dct['nmc'] / c for c in [1, 5, 10, 20]}
+    c_rates = {f'c_by{c}': cap_dct['nmc'] / c for c in [1, 3, 5, 10, 20]}
 
