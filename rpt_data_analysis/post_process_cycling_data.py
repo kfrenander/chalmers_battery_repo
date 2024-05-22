@@ -2,6 +2,7 @@ import os
 import re
 import pandas as pd
 import numpy as np
+from scipy.integrate import trapz
 
 
 def initiate_test_names():
@@ -97,7 +98,7 @@ class CycleAgeingDataIndexer:
         for tn in test_names:
             tmp_list = []
             for ch_id, ag_data in self.ageing_data.items():
-                if ag_data.test_name == tn:
+                if ag_data.TEST_NAME == tn:
                     tmp_list.append(ag_data.rpt_data)
             combined_df = pd.merge_asof(tmp_list[0], tmp_list[1],
                                         left_on='fce',
@@ -120,10 +121,12 @@ class CycleAgeingDataReader:
 
     def __init__(self, chnl_id=None, test_name=None, list_of_files=None):
         self.chnl_id = chnl_id
-        self.test_name = test_name
+        self.TEST_NAME = test_name
         self.pkl_files = list_of_files
         self.rpt_data = None
         self.ica_data = None
+        self.dyn_data = None
+        self.average_temperature = None
         self.read_rpt_summary()
         self.read_ica_data()
         self.visual_profile = VisualProfileUniqueTest(test_name=test_name)
@@ -179,14 +182,36 @@ class CycleAgeingDataReader:
         if not found_ica:
             print(f'No ica files found for data from channel {self.chnl_id}.\nPlease check data.')
 
+    def read_dynamic_data(self):
+        self.dyn_data = {}
+        found_dynamic_data = False
+        for pkl_file in self.pkl_files:
+            if 'dyn_df' in pkl_file:
+                found_dynamic_data = True
+                try:
+                    self.dyn_data = pd.read_pickle(pkl_file)
+                except (PermissionError, IOError, EOFError, ValueError, TypeError, MemoryError) as e:
+                    print(f"An error occurred while reading file '{pkl_file}': {e}")
+                except Exception as e:
+                    print(f"An error occurred while reading file '{pkl_file}': {e}")
+        if not found_dynamic_data:
+            print(f'No dynamic data files found for data from channel {self.chnl_id}.\nPlease check data.')
+
+    def make_temperature_summary(self):
+        if not isinstance(self.dyn_data, pd.DataFrame):
+            self.read_dynamic_data()
+        self.average_temperature = (trapz(self.dyn_data.temperature, self.dyn_data.float_time)
+                                    / self.dyn_data.float_time.max())
+        # TODO: Implement some kind of histogram for temperature visualisation
+
 
 class VisualProfileAllAgeingTests:
 
     def __init__(self):
-        self.test_names = initiate_test_names()
-        self.colors = self.initiate_color_dictionary()
-        self.line_styles = self.initiate_line_styles()
-        self.markers = self.initiate_markers()
+        self.TEST_NAMES = initiate_test_names()
+        self.COLORS = self.initiate_color_dictionary()
+        self.LINE_STYLES = self.initiate_line_styles()
+        self.MARKERS = self.initiate_markers()
 
     def initiate_color_dictionary(self):
         color_list = [
@@ -199,7 +224,7 @@ class VisualProfileAllAgeingTests:
             '#a3192f',
             '#000000'
         ]
-        return dict(zip(self.test_names, color_list))
+        return dict(zip(self.TEST_NAMES, color_list))
 
     def initiate_line_styles(self):
         line_style_list = [
@@ -212,7 +237,7 @@ class VisualProfileAllAgeingTests:
             (0, (5, 2)),
             (0, (15, 7, 5, 5, 2, 5))
         ]
-        return dict(zip(self.test_names, line_style_list))
+        return dict(zip(self.TEST_NAMES, line_style_list))
 
     def initiate_markers(self):
         marker_list = [
@@ -225,49 +250,49 @@ class VisualProfileAllAgeingTests:
             '+',
             '*'
         ]
-        return dict(zip(self.test_names, marker_list))
+        return dict(zip(self.TEST_NAMES, marker_list))
 
 
 class VisualProfileUniqueTest(VisualProfileAllAgeingTests):
 
     def __init__(self, test_name=None):
         super().__init__()
-        self.color = None
-        self.marker = None
-        self.line_style = None
-        self.test_name = test_name
+        self.COLOR = None
+        self.MARKER = None
+        self.LINE_STYLE = None
+        self.TEST_NAME = test_name
         self.set_unique_color()
         self.set_unique_marker()
 
     def set_unique_color(self):
         try:
-            self.color = self.colors[self.test_name]
+            self.COLOR = self.COLORS[self.TEST_NAME]
         except KeyError as e:
-            print(f'Could not set unique color for {self.test_name}, yields: {e}')
+            print(f'Could not set unique color for {self.TEST_NAME}, yields: {e}')
         except Exception as e:
             print(f'Unexpected error occured: {e}')
-        if not self.color:
+        if not self.COLOR:
             print(f'Defaulting color to forestgreen (#228B22)')
-            self.color = '#228B22'
+            self.COLOR = '#228B22'
 
     def set_unique_marker(self):
         try:
-            self.marker = self.markers[self.test_name]
+            self.MARKER = self.MARKERS[self.TEST_NAME]
         except KeyError as e:
-            print(f'Could not set unique marker for {self.test_name}, yields: {e}')
+            print(f'Could not set unique marker for {self.TEST_NAME}, yields: {e}')
         except Exception as e:
             print(f'Unexpected error occured: {e}')
-        if not self.color:
+        if not self.MARKER:
             print(f'Defaulting marker to square (.)')
-            self.color = '.'
+            self.MARKER = '.'
 
     def set_unique_line_style(self):
         try:
-            self.line_style = self.line_styles[self.test_name]
+            self.LINE_STYLE = self.LINE_STYLES[self.TEST_NAME]
         except KeyError as e:
-            print(f'Could not set unique line style for {self.test_name}, yields: {e}')
+            print(f'Could not set unique line style for {self.TEST_NAME}, yields: {e}')
         except Exception as e:
             print(f'Unexpected error occured: {e}')
-        if not self.color:
+        if not self.LINE_STYLE:
             print(f'Defaulting line style to solid ')
-            self.color = 'solid'
+            self.LINE_STYLE = 'solid'
