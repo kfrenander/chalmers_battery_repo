@@ -60,30 +60,32 @@ if __name__ == '__main__':
     for k, ag_data in cycle_data.ageing_data.items():
         tmp_df = ag_data.rpt_data
         ax.plot(tmp_df.fce, tmp_df.cap_relative,
-                color=ag_data.visual_profile.color,
-                marker=ag_data.visual_profile.marker,
-                label=ag_data.test_name)
+                color=ag_data.visual_profile.COLOR,
+                marker=ag_data.visual_profile.MARKER,
+                label=ag_data.TEST_NAME)
     plt.legend(ncols=2)
     ax.set_xlabel('FCE [-]')
     ax.set_ylabel('Capacity retention [-]')
+    ax.grid(alpha=0.4)
 
     fig, ax = plt.subplots(1, 1)
     for t_name, cmb_dat in cycle_data.combined_data.items():
         ax.plot(cmb_dat.fce, cmb_dat.avg_rel_cap,
-                color=cycle_data.visual_profile.colors[t_name],
-                marker=cycle_data.visual_profile.markers[t_name],
+                color=cycle_data.visual_profile.COLORS[t_name],
+                marker=cycle_data.visual_profile.MARKERS[t_name],
                 label=t_name)
     plt.legend(ncols=2)
     ax.set_xlabel('FCE [-]')
     ax.set_ylabel('Capacity retention [-]')
+    ax.grid(alpha=0.4)
 
     fig, ax = plt.subplots(1, 1)
     for t_name, cmb_dat in cycle_data.combined_data.items():
         ax.errorbar(cmb_dat.fce, cmb_dat.avg_rel_cap,
                     yerr=cmb_dat.std_rel_cap,
                     elinewidth=1.5,
-                    color=cycle_data.visual_profile.colors[t_name],
-                    marker=cycle_data.visual_profile.markers[t_name],
+                    color=cycle_data.visual_profile.COLORS[t_name],
+                    marker=cycle_data.visual_profile.MARKERS[t_name],
                     label=t_name,
                     markersize=mark_size,
                     capsize=cap_size)
@@ -100,14 +102,15 @@ if __name__ == '__main__':
             ax.errorbar(cmb_dat.fce, cmb_dat.avg_rel_cap,
                         yerr=cmb_dat.std_rel_cap,
                         elinewidth=1.5,
-                        color=cycle_data.visual_profile.colors[t_name],
-                        marker=cycle_data.visual_profile.markers[t_name],
+                        color=cycle_data.visual_profile.COLORS[t_name],
+                        marker=cycle_data.visual_profile.MARKERS[t_name],
                         label=t_name,
                         markersize=mark_size,
                         capsize=cap_size)
     plt.legend(ncols=2)
     ax.set_xlabel('FCE [-]')
     ax.set_ylabel('Capacity retention [-]')
+    ax.grid(alpha=0.4, color='grey')
     fig.savefig(os.path.join(output_dir, 'error_bar_pulse_ref_cells.png'), dpi=400)
 
     fig, ax = plt.subplots(1, 1)
@@ -116,14 +119,15 @@ if __name__ == '__main__':
             ax.errorbar(cmb_dat.fce, cmb_dat.avg_rel_cap,
                         yerr=cmb_dat.std_rel_cap,
                         elinewidth=1.5,
-                        color=cycle_data.visual_profile.colors[t_name],
-                        marker=cycle_data.visual_profile.markers[t_name],
+                        color=cycle_data.visual_profile.COLORS[t_name],
+                        marker=cycle_data.visual_profile.MARKERS[t_name],
                         label=t_name,
                         markersize=mark_size,
                         capsize=cap_size)
     plt.legend(ncols=2)
     ax.set_xlabel('FCE [-]')
     ax.set_ylabel('Capacity retention [-]')
+    ax.grid(alpha=0.4, color='grey')
     fig.savefig(os.path.join(output_dir, 'error_bar_dchg_pulse_cells.png'), dpi=400)
 
     plt.style.use('kelly_colors')
@@ -146,18 +150,18 @@ if __name__ == '__main__':
     plt.figure()
     for cell, age_data in cycle_data.ageing_data.items():
         df = age_data.ica_data['rpt_1']
-        plt.plot(df[df.curr > 0].volt, df[df.curr > 0].ica_gauss, color=age_data.visual_profile.color)
+        plt.plot(df[df.curr > 0].volt, df[df.curr > 0].ica_gauss, color=age_data.visual_profile.COLOR)
     plt.xlabel(r'Voltage [$\SI{}{\volt}$]')
     plt.ylabel(r'Incremental Capacity $\frac{dQ}{dV}$ [$\SI{}{\milli\ampere\hour\per\volt}$]')
 
     cases_to_plot = ['CC reference', '1000mHz']
     plt.figure()
     for cell, age_data in cycle_data.ageing_data.items():
-        if age_data.test_name in cases_to_plot:
+        if age_data.TEST_NAME in cases_to_plot:
             df = age_data.ica_data['rpt_11']
             plt.plot(df[df.curr > 0].volt, df[df.curr > 0].ica_gauss,
-                     color=age_data.visual_profile.color,
-                     label=age_data.test_name)
+                     color=age_data.visual_profile.COLOR,
+                     label=age_data.TEST_NAME)
     plt.xlabel(r'Voltage $\left[\unit{\volt}\right]$')
     plt.ylabel(r'Incremental Capacity $\frac{dQ}{dV}$ $[\unit{\milli\ampere\hour\per\volt}]$')
     plt.text(3, 4.2, 'EoL ICA ',
@@ -168,11 +172,11 @@ if __name__ == '__main__':
 
     plt.figure()
     for cell, age_data in cycle_data.ageing_data.items():
-        if age_data.test_name in cases_to_plot:
+        if age_data.TEST_NAME in cases_to_plot:
             df = age_data.ica_data['rpt_11']
             plt.plot(df[df.curr > 0].cap, df[df.curr > 0].dva_gauss,
-                     color=age_data.visual_profile.color,
-                     label=age_data.test_name)
+                     color=age_data.visual_profile.COLOR,
+                     label=age_data.TEST_NAME)
     plt.ylim((0, 3))
     plt.xlabel(r'Charge capacity $\left[\unit{\milli\ampere\hour}\right]$')
     plt.ylabel(r'Differential Voltage $\frac{dV}{dQ}$ '
@@ -189,7 +193,7 @@ if __name__ == '__main__':
         col_list = []
         for age_data in cycle_data.ageing_data.values():
             age_data.make_temperature_summary()
-            avg_temperatures[age_data.test_name] = age_data.average_temperature
+            avg_temperatures[age_data.TEST_NAME] = age_data.average_temperature
         plt.figure()
-        col_list = [cycle_data.visual_profile.colors[k] for k in avg_temperatures.keys()]
+        col_list = [cycle_data.visual_profile.COLORS[k] for k in avg_temperatures.keys()]
         plt.scatter(avg_temperatures.keys(), avg_temperatures.values(), color=col_list)
