@@ -7,6 +7,7 @@ win_str = 'Windows'
 linux_str = 'Linux'
 
 curr_pf = platform.platform()
+full_path = r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test1_1.pkl"
 file_path = pathlib.PureWindowsPath("stat_test\processed_data\Test2_2.pkl")
 
 if win_str in curr_pf:
