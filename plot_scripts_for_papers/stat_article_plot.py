@@ -12,11 +12,6 @@ from scipy.stats import f_oneway, norm, zscore, ttest_rel
 import os
 from backend_fix import fix_mpl_backend
 import pickle
-fix_mpl_backend()
-my_style = 'kelly_colors'
-plt.style.use(my_style)
-lbl_font = {'weight': 'normal',
-            'size': 14}
 
 
 def set_font_sizes(fig, fnt_sz):
@@ -441,6 +436,11 @@ def sort_dict(dct):
 
 
 def main():
+    fix_mpl_backend()
+    my_style = 'kelly_colors'
+    plt.style.use(my_style)
+    lbl_font = {'weight': 'normal',
+                'size': 14}
     data_set_location = r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\cycling_data"
     fig_op_dir = r"Z:\StatisticalTest\figures_new_test_names"
     global fixed_seed

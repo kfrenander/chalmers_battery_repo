@@ -52,7 +52,8 @@ def calculate_fce_from_rpt(rpt_str):
 
 
 if __name__ == '__main__':
-    data_loc = r"\\sol.ita.chalmers.se\groups\batt_lab_data\pulse_chrg_test\cycling_data"
+    #data_loc = r"\\sol.ita.chalmers.se\groups\batt_lab_data\pulse_chrg_test\cycling_data"
+    data_loc = '/mnt/batt_lab_data/pulse_chrg_test/cycling_data'
     cycle_data = CycleAgeingDataIndexer()
     cycle_data.run(data_loc)
 

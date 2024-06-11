@@ -7,6 +7,7 @@ from scipy import stats
 import numpy as np
 import pandas as pd
 from itertools import combinations
+from check_current_os import get_correct_path
 
 
 def plot_p_fail(p_fail_dct, lbl_case='fce'):
@@ -150,6 +151,7 @@ if __name__ == '__main__':
 
     dta = {}
     for k, val in data_files.items():
+        val = get_correct_path(val)
         with open(val, 'rb') as f:
             dta[k] = pickle.load(f)
 
