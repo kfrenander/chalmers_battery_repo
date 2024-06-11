@@ -13,7 +13,6 @@ mpl.rcParams['ytick.labelsize'] = 12
 mpl.rcParams['axes.labelsize'] = 20
 mpl.rcParams['axes.titlesize'] = 16
 mpl.rcParams['figure.figsize'] = 10, 8
-fix_mpl_backend()
 
 
 def look_up_fce(rpt_str):
@@ -863,6 +862,7 @@ class ReadRpt(object):
 
 
 if __name__ == '__main__':
+    fix_mpl_backend()
     ALINE_50DOD = OrganiseRpts(r"\\sol.ita.chalmers.se\groups\batt_lab_data\ALINE_data\50_dod_data", proj='aline')
     stat_test = OrganiseRpts(r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\cycling_data", proj='stat')
     test = OrganiseRpts(r"\\sol.ita.chalmers.se\groups\batt_lab_data\20210816", proj='bda_comp')
