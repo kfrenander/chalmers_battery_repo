@@ -73,6 +73,7 @@ class LgNewareData(BaseNewareData):
         self.rpt_analysis = LgRptData(self.find_rpt_dict(), self.ica_step_list)
         super().pickle_data_dump()
         super().write_rpt_summary()
+        super().write_meta_data()
         self.dyn_df = pd.DataFrame()
         self.xl_files = []
 
@@ -142,7 +143,7 @@ class LgRptData(BaseRptData):
                 step_df = self.char_dict[key][self.char_dict[key].step_nbr == stp]
                 if (step_df['step_mode'][0] == 'CC_DChg' or step_df['step_mode'][0] == 'CC DChg') and ref_df['step_mode'][0] == 'CCCV_Chg':
                     if abs(step_df.curr[0] + 1.15) < 0.2 and step_df['maxV'][0] > 4 and step_df['minV'][0] < 3:
-                        print('Cap is {:.2f} mAh'.format(step_df.cap[0]))
+                        print(f'Cap at rpt {i:.0f} is {step_df.cap[0]:.2f} mAh')
                         tmp_cap_df = pd.DataFrame(data=step_df.cap.values, columns=['cap'], index=[f'cap_meas_{i}'])
                         cap_df = pd.concat([cap_df, tmp_cap_df])
                         cap_df = cap_df.append(pd.DataFrame(data=step_df.cap.values, columns=['cap'],
@@ -157,7 +158,7 @@ class LgRptData(BaseRptData):
 
 if __name__ == '__main__':
     outer_tic = dt.datetime.now()
-    stat_test = r"\\sol.ita.chalmers.se\groups\batt_lab_data\pulse_chrg_test\initial_rpt"
+    stat_test = r"\\sol.ita.chalmers.se\groups\batt_lab_data\pulse_chrg_test\cycling_data"
     test_case = LgNewareDataSet(stat_test)
     outer_toc = dt.datetime.now()
     print('Total elapsed time was {:.2f} min.'.format((outer_toc - outer_tic).total_seconds() / 60))

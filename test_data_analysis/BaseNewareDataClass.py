@@ -1,12 +1,11 @@
-import sys
 import pandas as pd
 from scipy.integrate import cumtrapz
 import datetime as dt
 import numpy as np
 import re
 from natsort.natsort import natsorted
-from backend_fix import fix_mpl_backend
 import os
+from collections import OrderedDict
 
 
 class BaseNewareDataSet(object):
@@ -47,41 +46,66 @@ class BaseNewareData(object):
         self.file_names = list_of_files
         self.ica_step_list = []
         self.pkl_dir = ''
+        self.machine_id = ''
+        self.channel_id = ''
+        self.meta_data = None
         self.unit_name = self.find_unit_name()
-        self.channel_name = list(set(['{}_{}_{}'.format(*[x.strip('-') for x in re.findall(r'\d+-', file)])
-                                      for file in list_of_files]))[0]
+        self.machine_id, self.channel_id = self.find_machine_and_channel_id()
+        self.channel_name = self.make_channel_name()
+        self.set_pkl_dir()
+        self.test_id = self.find_test_id()
+        # self.channel_name = list(set(['{}_{}_{}'.format(*[x.strip('-') for x in re.findall(r'\d+-', file)])
+        #                              for file in list_of_files]))[0]
 
     def pickle_data_dump(self):
-        self.pkl_dir = os.path.join(os.path.split(self.file_names[0])[0],
-                                    'pickle_files_channel_{}'.format(self.channel_name))
+        if not self.pkl_dir:
+            self.set_pkl_dir()
         op_dir = self.pkl_dir
         rpt_dict = self.find_rpt_dict()
         if not os.path.isdir(op_dir):
             os.makedirs(op_dir)
         try:
             for key in self.rpt_analysis.ica_dict:
-                ica_file = '{}_ica_dump_{}.pkl'.format(self.channel_name, key)
-                res_file = '{}_res_dump_{}.pkl'.format(self.channel_name, key)
-                cap_file = '{}_cap_dump_{}.pkl'.format(self.channel_name, key)
-                rpt_file = '{}_rpt_raw_dump_{}.pkl'.format(self.channel_name, key)
+                ica_file = f'{self.channel_name}_ica_dump_{key}.pkl'
+                res_file = f'{self.channel_name}_res_dump_{key}.pkl'
+                cap_file = f'{self.channel_name}_cap_dump_{key}.pkl'
+                rpt_file = f'{self.channel_name}_rpt_raw_dump_{key}.pkl'
                 self.rpt_analysis.ica_dict[key].to_pickle(os.path.join(op_dir, ica_file))
                 self.rpt_analysis.res[key].to_pickle(os.path.join(op_dir, res_file))
                 self.rpt_analysis.cap[key].to_pickle(os.path.join(op_dir, cap_file))
                 rpt_dict[key].to_pickle(os.path.join(op_dir, rpt_file))
         except:
             print('Unable to pickle ICA and/or res')
-        rpt_summary_pickle = '{}_rpt_summary_dump.pkl'.format(self.channel_name)
-        dynamic_pickle = '{}_dyn_df_dump.pkl'.format(self.channel_name)
-        char_pickle = '{}_step_char_dump.pkl'.format(self.channel_name)
+        rpt_summary_pickle = f'{self.channel_name}_rpt_summary_dump.pkl'
+        dynamic_pickle = f'{self.channel_name}_dyn_df_dump.pkl'
+        char_pickle = f'{self.channel_name}_step_char_dump.pkl'
         self.rpt_analysis.summary.to_pickle(os.path.join(op_dir, rpt_summary_pickle))
         self.dyn_df.to_pickle(os.path.join(op_dir, dynamic_pickle))
         self.step_char.to_pickle(os.path.join(op_dir, char_pickle))
-        # stat_file = os.path.join(op_dir, '{}_stat_dump.pickle'.format(self.channel_name))
-        # with open(stat_file, 'wb') as f:
-        #     pickle.dump(self.step_char, f)
-        # rpt_file = os.path.join(op_dir, '{}_rpt_dump.pickle'.format(self.channel_name))
-        # with open(rpt_file, 'wb') as f:
-        #     pickle.dump(self.rpt_analysis, f)
+        return None
+
+    def make_meta_data_dict(self):
+        self.meta_data = {
+            'UNIT': self.unit_name,
+            'MACHINE': self.machine_id,
+            'CHANNEL': self.channel_id,
+            'TEST': self.test_id
+        }
+
+    def write_meta_data(self):
+        if not self.meta_data:
+            self.make_meta_data_dict()
+        if not self.pkl_dir:
+            self.set_pkl_dir()
+            if not os.path.isdir(self.pkl_dir):
+                os.makedirs(self.pkl_dir)
+        fname = os.path.join(self.pkl_dir, f'metadata_{self.channel_name}_test_{self.test_id}.txt')
+        with open(fname, 'w+') as f:
+            for key, value in self.meta_data.items():
+                f.write(f'{key}_ID\t\t\t: {value}\n')
+
+    def set_pkl_dir(self):
+        self.pkl_dir = os.path.join(os.path.split(self.file_names[0])[0], f'pickle_files_channel_{self.channel_name}')
         return None
 
     def step_characteristics(self, n_cores=8):
@@ -109,6 +133,29 @@ class BaseNewareData(object):
         if len(list(set(unit_list))) > 1:
             raise ValueError("More than one unit found in test list, check data")
         return list(set(unit_list))[0].strip('-')
+
+    def find_machine_and_channel_id(self):
+        # Regex pattern that looks for both leading AND trailing hyphen
+        pattern = r'(?<=-)\d+(?=-)'
+        all_cases = [re.findall(pattern, f) for f in self.file_names]
+        unique_lists = list(OrderedDict.fromkeys(tuple(lst) for lst in all_cases))
+        # Convert back to list of lists
+        unique_list = [list(tpl) for tpl in unique_lists][0]
+        machine_id = unique_list[0]
+        channel_id = unique_list[1]
+        return machine_id, channel_id
+
+    def make_channel_name(self):
+        return f'{self.unit_name}_{self.machine_id}_{self.channel_id}'
+
+    def find_test_id(self):
+        # Regex pattern to identify only the trailing umber preceded by hyphen
+        pattern = r'(?<=-)\d+(?=[^0-9]*$)'
+        # Regex pattern will only work if trailing number in file name can be removed, this requires the path to be
+        # reduced to only file name
+        fnames = [os.path.split(f)[-1] for f in self.file_names]
+        list_of_ids = [re.search(pattern, fname.split('_')[0]).group() for fname in fnames]
+        return np.unique(list_of_ids)[0]
 
     def read_dynamic_data(self):
         df = pd.DataFrame()
@@ -259,7 +306,7 @@ class BaseNewareData(object):
             new_rpt_step = rpt_rest_steps[rpt_rest_steps.step_nbr.diff() > 90].step_nbr.tolist()
             new_rpt_step.append(self.dyn_df.arb_step2.max())
             stop_idx = [int(rpt_rest_steps[rpt_rest_steps.step_nbr < int(val)].last_valid_index()) for val in new_rpt_step]
-            # stop_idx = pulse_chrg_steps[2::3].step_nbr.tolist()
+
             pulse_idx = pulse_chrg_steps.index.to_numpy()
             # dchg_30_soc_idx = self.step_char.loc[pulse_idx - 1, :][self.step_char.loc[pulse_idx - 1, 'minV'] < 3.46].index
             dchg_30_soc_idx = self.step_char.loc[pulse_idx - 4, :][self.step_char.loc[pulse_idx - 4, 'minV'] < 3.5].index
@@ -273,9 +320,7 @@ class BaseNewareData(object):
 
         stop_idx = stop_idx.drop_duplicates()
         start_idx = start_idx.drop_duplicates()
-        # if len(start_idx) > len(stop_idx):
-        #    fin_idx = self.step_char.loc[self.step_char.index == self.step_char.last_valid_index(), :].index
-        #    stop_idx = stop_idx.append(fin_idx)
+
 
         # Since some tests do not properly start from scratch the first found RPT might be the second, so this must be
         # kept despite not fulfilling the diff requirement.
@@ -336,32 +381,6 @@ class BaseRptData(object):
     def sort_individual_rpt(self, df):
         self.rpt_dict = {'rpt_{:.0f}'.format(marks): df[df.mark == marks] for marks in df.mark.unique()}
         return None
-
-    # def find_capacity_measurement(self, key):
-    #     cap_df = pd.DataFrame(columns=['cap'])
-    #     i = 1
-    #     for stp in self.char_dict[key].step_nbr:
-    #         try:
-    #             ref_df =  self.char_dict[key][self.char_dict[key].step_nbr == stp - 2]
-    #             step_df = self.char_dict[key][self.char_dict[key].step_nbr == stp]
-    #             if (step_df['step_mode'][0] == 'CC_DChg' or step_df['step_mode'][0] == 'CC DChg') and ref_df['step_mode'][0] == 'CCCV_Chg':
-    #                 if abs(step_df.curr[0] + 1.53) < 0.2 and step_df['maxV'][0] > 4 and step_df['minV'][0] < 3:
-    #                     print('Cap is {:.2f} mAh'.format(step_df.cap[0]))
-    #                     cap_df = cap_df.append(pd.DataFrame(data=step_df.cap.values, columns=['cap'],
-    #                                                         index=['cap_meas_{}'.format(i)]))
-    #                     i += 1
-    #         except:
-    #             pass
-    #     cap_df.loc['mean'] = cap_df.mean()
-    #     return cap_df
-
-    def plot_rpt_voltage(self):
-        plt.style.use('ggplot')
-        n = len(self.rpt_dict)
-        fig, axs = plt.subplots(n, 1, sharex=True, sharey=True)
-        for i, ax in enumerate(axs):
-            ax.plot(self.rpt_dict['rpt_{}'.format(i + 1)].float_time - self.rpt_dict['rpt_{}'.format(i + 1)].float_time[0],
-                    self.rpt_dict['rpt_{}'.format(i + 1)].volt, label='RPT voltage')
 
     def ica_analysis(self):
         from test_data_analysis.ica_analysis import perform_ica
