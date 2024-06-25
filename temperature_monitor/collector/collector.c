@@ -8,15 +8,17 @@
 #define BUFFER_SIZE 1024
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <server_address>\n", argv[0]);
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <server_address> <output_file>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
     char *server_address = argv[1];
+    char *output_file = argv[2];
     int sock = 0;
     struct sockaddr_in serv_addr;
     char buffer[BUFFER_SIZE] = {0};
+    FILE *file;
 
     // Create socket file descriptor
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -43,18 +45,29 @@ int main(int argc, char *argv[]) {
 
     printf("Connected to %s on port %d\n", server_address, PORT);
 
+    // Open file for appending
+    file = fopen(output_file, "a");
+    if (file == NULL) {
+        perror("Failed to open file");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+
     // Listen for data from the server
     int read_size;
     while ((read_size = read(sock, buffer, BUFFER_SIZE - 1)) > 0) {
         buffer[read_size] = '\0';  // Null-terminate the buffer
         printf("Received: %s\n", buffer);
+        fprintf(file, "%s", buffer);
+        fflush(file);  // Ensure the data is written to the file immediately
     }
 
     if (read_size < 0) {
         perror("Read error");
     }
 
-    // Close the socket
+    // Close the file and the socket
+    fclose(file);
     close(sock);
 
     return 0;
