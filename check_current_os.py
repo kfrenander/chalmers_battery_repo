@@ -53,6 +53,15 @@ def get_correct_path(input_path):
 
     return correct_path
 
+
+def get_base_path_batt_lab_data():
+    current_os = platform.system()
+    if current_os == 'Windows':
+        return "//sol.ita.chalmers.se/groups/batt_lab_data"
+    elif current_os == 'Linux':
+        return "/batt_lab_data"
+
+
 if __name__ == '__main__':
     # Example usage
     input_path_windows = r'\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test1_1.pkl'
