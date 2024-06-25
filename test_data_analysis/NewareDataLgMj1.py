@@ -9,6 +9,7 @@ import numpy as np
 from test_data_analysis.rpt_analysis import characterise_steps
 from multiprocessing import Pool
 import pickle
+import glob
 
 
 class LgNewareDataSet(BaseNewareDataSet):
@@ -19,22 +20,28 @@ class LgNewareDataSet(BaseNewareDataSet):
 
     def fill_data(self):
         temp_dict = {}
-        for key in self.chan_file_dict:
+        for key, itm_lst in self.chan_file_dict.items():
             # remaining_list = ['2-2']  #['1-1', '1-3', '1-5', '1-6', '2-1', '2-5', '2-6']
             #if any(s in key for s in remaining_list):
-            root_dir = os.path.split(self.chan_file_dict[key][0])[0]
+            root_dir = os.path.split(itm_lst[0])[0]
             chan_id = re.findall(r'\b\d\b', key)
             chan_number = '_'.join(chan_id)
             # exp_name = f'pickle_files_channel_{chan_number}'
             exp_name = f'pickle_files_channel_{key}'
-            print('Calling Neware data with {}'.format(key))
+            print(f'Calling Neware data with {key}')
             tic = dt.datetime.now()
-            pkl_dir = [os.path.join(root_dir, name) for name in os.listdir(root_dir) if name == exp_name]
-            if os.path.exists(os.path.join(root_dir, exp_name.replace('-', '_'))):
-                print('Files already read. \n Read pickle dumps instead')
+            pkl_dir = os.path.join(root_dir, exp_name.replace('-', '_'))
+            if os.path.exists(pkl_dir):
+                print('Files already read. \nWill check if metadata update needed')
+                metadata_files = glob.glob(os.path.join(pkl_dir, 'metadata*.txt'))
+                if metadata_files:
+                    print('Metadata files already generated, no update needed')
+                else:
+                    base_data = BaseNewareData(itm_lst)
+                    base_data.write_meta_data()
             else:
                 try:
-                    temp_dict[key] = LgNewareData(self.chan_file_dict[key])
+                    temp_dict[key] = LgNewareData(itm_lst)
                 except OSError as e:
                     print('Probably not enough memory')
                     print(e)
@@ -46,7 +53,7 @@ class LgNewareDataSet(BaseNewareDataSet):
             #     print('General error')
             #     temp_dict[key] = 'Placeholder due to unknown error'
             toc = dt.datetime.now()
-            print('Time elapsed for test {} was {:.2f} min.'.format(key, (toc-tic).total_seconds() / 60))
+            print(f'Time elapsed for test {key} was {(toc-tic).total_seconds() / 60:.2f} min.\n\n')
         self.data_dict = temp_dict
         return None
 
@@ -158,7 +165,7 @@ class LgRptData(BaseRptData):
 
 if __name__ == '__main__':
     outer_tic = dt.datetime.now()
-    stat_test = r"\\sol.ita.chalmers.se\groups\batt_lab_data\pulse_chrg_test\cycling_data"
+    stat_test = r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\cycling_data"
     test_case = LgNewareDataSet(stat_test)
     outer_toc = dt.datetime.now()
     print('Total elapsed time was {:.2f} min.'.format((outer_toc - outer_tic).total_seconds() / 60))

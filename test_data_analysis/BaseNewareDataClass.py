@@ -103,6 +103,7 @@ class BaseNewareData(object):
         with open(fname, 'w+') as f:
             for key, value in self.meta_data.items():
                 f.write(f'{key}_ID\t\t\t: {value}\n')
+        print(f'Metadata written for unit {self.unit_name} and channel {self.machine_id}_{self.channel_id}')
 
     def set_pkl_dir(self):
         self.pkl_dir = os.path.join(os.path.split(self.file_names[0])[0], f'pickle_files_channel_{self.channel_name}')
