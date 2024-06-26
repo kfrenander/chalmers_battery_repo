@@ -138,15 +138,18 @@ def calc_t_stat(d1, d2):
 
 if __name__ == '__main__':
     import time
+    from check_current_os import get_base_path_batt_lab_data
     start = time.time()
     data_files = {
-        "Test D": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test2_2.pkl",
-        "Test A": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test1_1.pkl",
-        "Test B": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test1_2.pkl",
-        "Test C": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test2_1.pkl"
+        "Test D": r"stat_test/processed_data/Test2_2.pkl",
+        "Test A": r"stat_test/processed_data/Test1_1.pkl",
+        "Test B": r"stat_test/processed_data/Test1_2.pkl",
+        "Test C": r"stat_test/processed_data/Test2_1.pkl"
     }
     data_files = sort_dict(data_files)
-    base_dir = r"Z:\StatisticalTest\figures_new_test_names"
+    BASE_BATT_LAB_DIR = get_base_path_batt_lab_data()
+    BASE_OUTPUT_DIR = r"Z:\StatisticalTest\figures_new_test_names"
+    data_files = {k: os.path.join(BASE_BATT_LAB_DIR, nm) for k, nm in data_files.items()}
     savefig = 0
 
     dta = {}
@@ -192,7 +195,7 @@ if __name__ == '__main__':
         fig.supylabel('Ordered values', fontsize=16)
         fig.tight_layout()
         if savefig:
-            fig.savefig(os.path.join(base_dir, cs, f'qq_plot_{cs}.png'), dpi=400)
+            fig.savefig(os.path.join(BASE_OUTPUT_DIR, cs, f'qq_plot_{cs}.png'), dpi=400)
 
     # CHECK HOMOGENOUS VARIANCE BETWEEN TESTS
     rpt_comp = {f'rpt_{k}': {nm: dta[nm].filter(like='cap').loc[f'rpt_{k}', :] for nm in dta.keys()}
@@ -202,16 +205,16 @@ if __name__ == '__main__':
 
     # PLOT PROBABILITIES OF FALSE CONCLUSIONS FOR TWO TYPES OF T-TEST
     p_fig_ttest_rel = plot_p_fail(p_fail_ttest_rel)
-    p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prob_ttest_rel_fce.png'), dpi=400)
-    p_fig_ttest_rel.savefig(os.path.join(base_dir, f'fail_prob_ttest_rel_fce.pdf'))
+    p_fig_ttest_rel.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_rel_fce.png'), dpi=400)
+    p_fig_ttest_rel.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_rel_fce.pdf'))
 
     p_fig_ttest_ind = plot_p_fail(p_fail_ttest_ind)
-    p_fig_ttest_ind.savefig(os.path.join(base_dir, f'fail_prob_ttest_ind_fce.png'), dpi=400)
-    p_fig_ttest_ind.savefig(os.path.join(base_dir, f'fail_prob_ttest_ind_fce.pdf'))
+    p_fig_ttest_ind.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_ind_fce.png'), dpi=400)
+    p_fig_ttest_ind.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_ind_fce.pdf'))
 
     p_fig_anova = plot_p_fail(p_fail_ttest_ind)
-    p_fig_anova.savefig(os.path.join(base_dir, f'fail_prob_anova_fce.png'), dpi=400)
-    p_fig_anova.savefig(os.path.join(base_dir, f'fail_prob_anova_fce.pdf'))
+    p_fig_anova.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_anova_fce.png'), dpi=400)
+    p_fig_anova.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_anova_fce.pdf'))
 
     end = time.time()
     print(f'Total time elapsed is {(end - start)/60:.2f} min')
