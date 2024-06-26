@@ -9,7 +9,7 @@
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
-        fprintf(stderr, "Usage: %s <server_address> <output_file>\n", argv[0]);
+        fprintf(stderr, "Usaage: %s <server_address> <output_file>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
