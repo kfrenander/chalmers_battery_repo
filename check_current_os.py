@@ -59,7 +59,7 @@ def get_base_path_batt_lab_data():
     if current_os == 'Windows':
         return "//sol.ita.chalmers.se/groups/batt_lab_data"
     elif current_os == 'Linux':
-        return "/batt_lab_data"
+        return "/mnt/batt_lab_data"
 
 
 if __name__ == '__main__':
