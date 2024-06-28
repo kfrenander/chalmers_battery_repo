@@ -4,6 +4,18 @@ import numpy as np
 from scipy.optimize import fsolve
 
 
+def exp_decay_fun(t, q0, tau, beta):
+    return q0 * np.exp(-(t / tau) ** beta)
+
+
+def linear_decay_fun(t, k):
+    return 1 - k * t
+
+
+def linear_decay_fun_free(t, q0, k):
+    return q0 - k * t
+
+
 class ExponentialDecayFitter(object):
 
     def __init__(self, x_data, y_data, model_type='exp_decay'):
@@ -12,6 +24,7 @@ class ExponentialDecayFitter(object):
         self.fit_model = model_type
         self.params = self.set_params()
         self.result = minimize(self.fit_fun, self.params, args=(self.x_, self.y_))
+        self.fitted_params = self.propagate_fitted_params()
         self.eol_fit = self.find_eol_fit()
 
     def fit_fun(self, params, x, y=np.array([])):
@@ -19,13 +32,17 @@ class ExponentialDecayFitter(object):
             q0 = params['q0'].value
             tau = params['tau'].value
             beta = params['beta'].value
-            model = self.exp_decay_fun(x, q0, tau, beta)
+            model = exp_decay_fun(x, q0, tau, beta)
         elif self.fit_model == 'linear':
             k = params['k'].value
-            model = self.linear_decay_fun(x, k)
+            model = linear_decay_fun(x, k)
         if y.size == 0:
             return model
         return y - model
+
+    def propagate_fitted_params(self):
+        return {param_name: param_val for param_name, param_val in self.result.params.items()}
+
 
     def plot_fit(self, ax):
         if not self.result:
@@ -56,19 +73,14 @@ class ExponentialDecayFitter(object):
         q0 = args[0]
         tau = args[1]
         beta = args[2]
-        return self.exp_decay_fun(t, q0, tau, beta) - eol
+        return exp_decay_fun(t, q0, tau, beta) - eol
 
-    @staticmethod
-    def exp_decay_fun(t, q0, tau, beta):
-        return q0 * np.exp(-(t / tau) ** beta)
-
-    @staticmethod
-    def linear_decay_fun(t, k):
-        return 1 - k*t
-
-    @staticmethod
-    def linear_decay_fun_free(t, q0, k):
-        return q0 - k * t
+    def display_fitted_params(self):
+        result_string = ""
+        for param_name, param in self.result.params.items():
+            result_string += f"Value of param {param_name} is {param.value:.2f}\n"
+        print(result_string)
+        return None
 
 
 if __name__ == '__main__':
@@ -108,3 +120,4 @@ if __name__ == '__main__':
     param_str = '\n'.join([fr'{k}: {val:.2f}' for k, val in param_vals.items()])
     # param_str = '\n'.join(str(param_vals).strip('{').strip('}').split(','))
     plt.text(160, 0.9, param_str, fontsize=12, bbox=dict(facecolor='wheat', alpha=0.5))
+    test_case.display_fitted_params()
