@@ -1,1 +1,1 @@
-echo "Sensor 3 (room 1), limits: 15-25 degC, actual value: 25.1 degC" | mailx -s "Warning! Batterylab temperature out of range." -a "From: Anders Celsius <temp-monitor@batterilabbet.elteknik.chalmers.se>" jutsell@chalmers.se
+echo "Sensor 3 (room 1), limits: 15-25 degC, actual value: 25.1 degC" | mailx -s "Warning! Batterylab temperature out of range." -a "From: Anders Celsius temp-monitor@batterilabbet.elteknik.chalmers.se>" jutsell@chalmers.se

@@ -1,0 +1,5 @@
+comp  192.168.1.30
+room1          .31
+room2          .32
+fridge         .33
+glovebox       .34
