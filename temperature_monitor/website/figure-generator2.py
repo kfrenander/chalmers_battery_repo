@@ -63,7 +63,7 @@ def main():
     fig.update_yaxes(title_text="Temperature [\N{DEGREE SIGN}C]")
 
     fig_title = (f"<b>E2 Battery Laboratory Temperature History</b>. "
-                 f"Current temperature: {round(df.temperature.iloc[-1], 2)}\N{DEGREE SIGN}. "
+                 f"Current temperature: {round(df.temperature.iloc[-1], 2)} \N{DEGREE SIGN}C. "
                  f"Updated: {current_datetime}")
     fig.update_layout(showlegend=False, title_text=fig_title)
     fig.write_html(sy.argv[2], auto_open=False)
