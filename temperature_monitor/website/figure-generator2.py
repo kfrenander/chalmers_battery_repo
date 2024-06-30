@@ -60,7 +60,7 @@ def main():
     fig.add_trace(go.Scatter(x=downsampled_df.datetime, y=downsampled_df.temperature), row=3, col=2)
 
     fig.update_xaxes(title_text="Time")
-    fig.update_yaxes(title_text="Temperature [\N{DEGREE SIGN}]")
+    fig.update_yaxes(title_text="Temperature [\N{DEGREE SIGN}]C")
 
     fig_title = (f"<b>E2 Battery Laboratory Temperature History</b>. "
                  f"Current temperature: {round(df.temperature.iloc[-1], 2)}\N{DEGREE SIGN}C. "
