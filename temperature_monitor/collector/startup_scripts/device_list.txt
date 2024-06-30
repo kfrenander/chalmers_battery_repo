@@ -1,5 +1,0 @@
-T1 room     .31
-T2 room     .32
-T3 fridge   .33
-T4 glovebox .34
-
