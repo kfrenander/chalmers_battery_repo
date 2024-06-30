@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #define PORT 10001
 #define BUFFER_SIZE 1024
@@ -58,7 +59,7 @@ int main(int argc, char *argv[]) {
     while ((read_size = read(sock, buffer, BUFFER_SIZE - 1)) > 0) {
         buffer[read_size] = '\0';  // Null-terminate the buffer
         printf("Received: %s\n", buffer);
-        fprintf(file, "%s", buffer);
+        fprintf(file, "%lu,%s", (unsigned long)time(NULL), buffer);
         fflush(file);  // Ensure the data is written to the file immediately
     }
 
