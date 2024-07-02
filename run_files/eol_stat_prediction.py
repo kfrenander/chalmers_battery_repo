@@ -8,10 +8,10 @@ from pd2ppt import df_to_powerpoint, df_to_table
 from pptx import Presentation
 from scipy.stats import norm
 from matplotlib import font_manager
-fontProperties = {'family':'sans-serif',
-                  'sans-serif':['Helvetica'],
-                  'weight' : 'normal',
-                  'size' : 12}
+fontProperties = {'family': 'sans-serif',
+                  'sans-serif': ['Helvetica'],
+                  'weight': 'normal',
+                  'size': 12}
 
 
 plt.rcParams.update({
