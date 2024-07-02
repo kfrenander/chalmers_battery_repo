@@ -19,11 +19,10 @@ def downsample_data(df, rule):
 
 def main():
     df = pd.read_csv(sy.argv[1], names=['timestamp', 'temperature'])
-    df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+    df['datetime'] = pd.to_datetime(df['timestamp'], unit='s', utc=True).dt.tz_convert('Europe/Stockholm')
 
-    current_timestamp = dt.datetime.now()
+    current_timestamp = pd.Timestamp.now(tz='Europe/Stockholm')
     current_datetime = current_timestamp.strftime("%Y-%m-%d %H:%M:%S")
-    debug_timestamp = pd.to_datetime(df['timestamp'].iloc[-1], unit='s')
 
     fig = make_subplots(
         rows=3, cols=2,
@@ -37,21 +36,21 @@ def main():
                         "Last 365d (one sample per day)",
                         "Since start (one sample per day)"))
 
-    filtered_df = filter_data(df, debug_timestamp, dt.timedelta(hours=24))
+    filtered_df = filter_data(df, current_timestamp, dt.timedelta(hours=24))
     fig.add_trace(go.Scatter(x=filtered_df.datetime, y=filtered_df.temperature),
                   row=1, col=1)
 
-    filtered_df = filter_data(df, debug_timestamp, dt.timedelta(days=7))
+    filtered_df = filter_data(df, current_timestamp, dt.timedelta(days=7))
     downsampled_df = downsample_data(filtered_df, '30min')
     fig.add_trace(go.Scatter(x=downsampled_df.datetime, y=downsampled_df.temperature),
                   row=2, col=1)
 
-    filtered_df = filter_data(df, debug_timestamp, dt.timedelta(days=30))
+    filtered_df = filter_data(df, current_timestamp, dt.timedelta(days=30))
     downsampled_df = downsample_data(filtered_df, '1h')
     fig.add_trace(go.Scatter(x=downsampled_df.datetime, y=downsampled_df.temperature),
                   row=2, col=2)
 
-    filtered_df = filter_data(df, debug_timestamp, dt.timedelta(days=365))
+    filtered_df = filter_data(df, current_timestamp, dt.timedelta(days=365))
     downsampled_df = downsample_data(filtered_df, '1D')
     fig.add_trace(go.Scatter(x=downsampled_df.datetime, y=downsampled_df.temperature),
                   row=3, col=1)
