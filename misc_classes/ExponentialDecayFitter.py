@@ -16,6 +16,13 @@ def linear_decay_fun_free(t, q0, k):
     return q0 - k * t
 
 
+def solve_eol_fun(t, args, eol=0.7):
+    q0 = args[0]
+    tau = args[1]
+    beta = args[2]
+    return exp_decay_fun(t, q0, tau, beta) - eol
+
+
 class ExponentialDecayFitter(object):
 
     def __init__(self, x_data, y_data, model_type='exp_decay'):
@@ -23,8 +30,9 @@ class ExponentialDecayFitter(object):
         self.y_ = y_data
         self.fit_model = model_type
         self.params = self.set_params()
-        self.result = minimize(self.fit_fun, self.params, args=(self.x_, self.y_))
-        self.fitted_params = self.propagate_fitted_params()
+        self.result = None
+        self.fitted_params = None
+        self.run_fit()
         self.eol_fit = self.find_eol_fit()
 
     def fit_fun(self, params, x, y=np.array([])):
@@ -43,18 +51,34 @@ class ExponentialDecayFitter(object):
     def propagate_fitted_params(self):
         return {param_name: param_val for param_name, param_val in self.result.params.items()}
 
+    def run_fit(self):
+        self.result = minimize(self.fit_fun, self.params, args=(self.x_, self.y_))
+        self.fitted_params = self.propagate_fitted_params()
+        self.eol_fit = self.find_eol_fit()
 
-    def plot_fit(self, ax):
+    def plot_fit(self, ax=None, disp_params=False):
+        if ax is None:
+            fig, ax = plt.subplots(1, 1)
         if not self.result:
             self.result = minimize(self.fit_fun, self.params, args=(self.x_, self.y_))
         ax.scatter(self.x_, self.y_, label='Raw data', color='orange')
         x = np.linspace(self.x_.min(), self.x_.max(), 250)
         ax.plot(x, self.fit_fun(self.result.params, x), label='Fit data', linestyle='dashed')
+        if disp_params:
+            param_vals = {k: self.result.params[k].value for k in self.result.params.keys()}
+            param_str = '\n'.join([fr'{k}: {val:.2f}' for k, val in param_vals.items()])
+            plt.text(0.75, 0.85, param_str,
+                     fontsize=12,
+                     bbox=dict(facecolor='wheat', alpha=0.5),
+                     horizontalalignment='left',
+                     verticalalignment='center', transform=ax.transAxes
+                     )
         return ax
 
-    def find_eol_fit(self):
-        params = [k.value for k in self.result.params.values()]
-        return fsolve(self.solve_eol_fun, 200, args=(params))
+    def find_eol_fit(self, params=None):
+        if not params:
+            params = [k.value for k in self.result.params.values()]
+        return fsolve(solve_eol_fun, 200, args=(params))
 
     def set_params(self):
         params = Parameters()
@@ -68,12 +92,6 @@ class ExponentialDecayFitter(object):
             params.add('q0', value=1)
             params.add('k', value=2e-3)
         return params
-
-    def solve_eol_fun(self, t, args, eol=0.7):
-        q0 = args[0]
-        tau = args[1]
-        beta = args[2]
-        return exp_decay_fun(t, q0, tau, beta) - eol
 
     def display_fitted_params(self):
         result_string = ""
