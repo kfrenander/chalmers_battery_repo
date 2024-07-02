@@ -96,7 +96,10 @@ class PopulationParameterEstimator(object):
 
 if __name__ == '__main__':
     import pandas as pd
-    df = pd.read_pickle(r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test1_1.pkl")
+    import os
+    from check_current_os import get_base_path_batt_lab_data
+    BASE_BATTLAB_PATH = get_base_path_batt_lab_data()
+    df = pd.read_pickle(os.path.join(BASE_BATTLAB_PATH, "stat_test\processed_data\Test1_1.pkl"))
     test_case = PopulationParameterEstimator(df)
     dct_of_pkl = {
         "2-1": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test2_1.pkl",
