@@ -14,7 +14,6 @@ class PopulationParameterEstimator(object):
         self.mu_, self.sig_, self.sig_mu, self.sig_sig = self.estimate_population_parameters()
         self.rse = self.estimate_rse()
 
-
     def extract_combinations(self):
         _, n = self.df.filter(like='cap').shape
         cols = self.df.filter(like='cap').columns
@@ -43,7 +42,9 @@ class PopulationParameterEstimator(object):
             sig_sig = {k: np.std(vals, ddof=1) for k, vals in sig_.items()}
             sig_mu_.iloc[i - 1, :] = [sig_mu_i for sig_mu_i in sig_mu.values()]
             sig_sig_.iloc[i - 1, :] = [sig_sig_i for sig_sig_i in sig_sig.values()]
-        return mu_, sig_, sig_mu_.dropna(how='all').dropna(how='all', axis=1), sig_sig_.dropna(how='all').dropna(how='all', axis=1)
+        return (mu_, sig_,
+                sig_mu_.dropna(how='all').dropna(how='all', axis=1),
+                sig_sig_.dropna(how='all').dropna(how='all', axis=1))
 
     def plot_var_mu(self, ax, case_to_plot='mu', sig_thresh=None, fig_title='', fmt='fce_num'):
         plt.style.use('kelly_colors')
@@ -99,13 +100,13 @@ if __name__ == '__main__':
     import os
     from check_current_os import get_base_path_batt_lab_data
     BASE_BATTLAB_PATH = get_base_path_batt_lab_data()
-    df = pd.read_pickle(os.path.join(BASE_BATTLAB_PATH, "stat_test\processed_data\Test1_1.pkl"))
+    df = pd.read_pickle(os.path.join(BASE_BATTLAB_PATH, "stat_test/processed_data/Test1_1.pkl"))
     test_case = PopulationParameterEstimator(df)
     dct_of_pkl = {
-        "2-1": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test2_1.pkl",
-        "1-1": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test1_1.pkl",
-        "2-2": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test2_2.pkl",
-        "1-2": r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\processed_data\Test1_2.pkl"
+        "2-1": r"stat_test/processed_data/Test2_1.pkl",
+        "1-1": r"stat_test/processed_data/Test1_1.pkl",
+        "2-2": r"stat_test/processed_data/Test2_2.pkl",
+        "1-2": r"stat_test/processed_data/Test1_2.pkl"
     }
-    df_dict = {k: pd.read_pickle(f_) for k, f_ in dct_of_pkl.items()}
+    df_dict = {k: pd.read_pickle(os.path.join(BASE_BATTLAB_PATH, f_)) for k, f_ in dct_of_pkl.items()}
     ppe_dict = {k: PopulationParameterEstimator(df) for k, df in df_dict.items()}
