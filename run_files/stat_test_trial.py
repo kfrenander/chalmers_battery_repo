@@ -141,14 +141,14 @@ if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
     start = time.time()
     data_files = {
-        "Test D": r"stat_test/processed_data/Test2_2.pkl",
-        "Test A": r"stat_test/processed_data/Test1_1.pkl",
-        "Test B": r"stat_test/processed_data/Test1_2.pkl",
-        "Test C": r"stat_test/processed_data/Test2_1.pkl"
+        "Test D": "stat_test/synthetic_data/chng_noise_data/Test_D_increase_noise.pkl",
+        "Test A": "stat_test/synthetic_data/chng_noise_data/Test_A_increase_noise.pkl",
+        "Test B": "stat_test/synthetic_data/chng_noise_data/Test_B_increase_noise.pkl",
+        "Test C": "stat_test/synthetic_data/chng_noise_data/Test_C_increase_noise.pkl"
     }
     data_files = sort_dict(data_files)
     BASE_BATT_LAB_DIR = get_base_path_batt_lab_data()
-    BASE_OUTPUT_DIR = r"Z:\StatisticalTest\figures_new_test_names"
+    BASE_OUTPUT_DIR = r"Z:\StatisticalTest\figures_from_synthetic_data"
     data_files = {k: os.path.join(BASE_BATT_LAB_DIR, nm) for k, nm in data_files.items()}
     savefig = 0
 
@@ -167,9 +167,9 @@ if __name__ == '__main__':
     print('Starting statistical testing')
     p_fail_ttest_rel, ref_prob_ttest_rel = perform_full_stat_test(dta, method='ttest')
     print('ttest_rel done...')
-    p_fail_ttest_ind, ref_prob_ttest_ind = perform_full_stat_test(dta, method='ttest_ind')
+    # p_fail_ttest_ind, ref_prob_ttest_ind = perform_full_stat_test(dta, method='ttest_ind')
     print('ttest_ind done...')
-    p_fail_anova, ref_prob_anova = perform_full_stat_test(dta, method='anova')
+    # p_fail_anova, ref_prob_anova = perform_full_stat_test(dta, method='anova')
     print('ANOVA done...')
 
     # CHECK NORMALITY OF DATA WITH QQ-PLOT ON EACH RPT
@@ -205,16 +205,16 @@ if __name__ == '__main__':
 
     # PLOT PROBABILITIES OF FALSE CONCLUSIONS FOR TWO TYPES OF T-TEST
     p_fig_ttest_rel = plot_p_fail(p_fail_ttest_rel)
-    p_fig_ttest_rel.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_rel_fce.png'), dpi=400)
-    p_fig_ttest_rel.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_rel_fce.pdf'))
+    p_fig_ttest_rel.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_rel_fce_inc_noise.png'), dpi=400)
+    p_fig_ttest_rel.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_rel_fce_inc_noise.pdf'))
 
-    p_fig_ttest_ind = plot_p_fail(p_fail_ttest_ind)
-    p_fig_ttest_ind.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_ind_fce.png'), dpi=400)
-    p_fig_ttest_ind.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_ind_fce.pdf'))
-
-    p_fig_anova = plot_p_fail(p_fail_ttest_ind)
-    p_fig_anova.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_anova_fce.png'), dpi=400)
-    p_fig_anova.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_anova_fce.pdf'))
+    # p_fig_ttest_ind = plot_p_fail(p_fail_ttest_ind)
+    # p_fig_ttest_ind.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_ind_fce.png'), dpi=400)
+    # p_fig_ttest_ind.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_ind_fce.pdf'))
+    #
+    # p_fig_anova = plot_p_fail(p_fail_ttest_ind)
+    # p_fig_anova.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_anova_fce.png'), dpi=400)
+    # p_fig_anova.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_anova_fce.pdf'))
 
     end = time.time()
     print(f'Total time elapsed is {(end - start)/60:.2f} min')
