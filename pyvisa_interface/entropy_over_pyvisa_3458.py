@@ -20,7 +20,7 @@ obj21.write('DCI 1')
 
 start_time = time.time()
 
-while time.time < start_time + 10:
+while time.time() < start_time + 10:
     meas_timestamp = time.time()
     try:
         meas_current = float(obj21.query('DCI?'))
