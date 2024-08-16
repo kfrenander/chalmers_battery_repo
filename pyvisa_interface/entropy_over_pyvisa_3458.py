@@ -24,7 +24,7 @@ obj21.write('DCI 1')
 
 start_time = time.time()
 
-while time.time() < start_time + 10:
+while 1:
     meas_timestamp = time.time()
     try:
         meas_current = float(obj21.query('DCI?'))
@@ -44,7 +44,7 @@ while time.time() < start_time + 10:
         print(f'Resistance measurement failed at {meas_timestamp}')
         meas_fres = np.nan
 
-    print(f'\rLatest measurement:\n\tCurrent: {meas_current:.2e}A\n\tVoltage:{meas_voltage:.2e}V\n\tResistance:{meas_fres}')
+    print(f'\rLatest measurement:\n\tCurrent: {meas_current:.6e}A\n\tVoltage:{meas_voltage:.7e}V\n\tResistance:{meas_fres}')
     with open(op_file, 'a+', buffering=1) as f:
         output_data = f'{meas_timestamp}, {meas_voltage}, {meas_current}, {meas_fres}\n'
         f.write(output_data)
