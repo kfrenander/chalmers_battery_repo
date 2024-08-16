@@ -17,7 +17,9 @@ obj22 = rm.open_resource(instr22)
 obj25 = rm.open_resource(instr25)
 
 obj21.write('END ALWAYS')
+obj21.write('NPLC 100')
 obj22.write('END ALWAYS')
+obj22.write('NPLC 100')
 obj21.write('DCI 1')
 
 start_time = time.time()
@@ -46,3 +48,4 @@ while time.time() < start_time + 10:
     with open(op_file, 'a+', buffering=1) as f:
         output_data = f'{meas_timestamp}, {meas_voltage}, {meas_current}, {meas_fres}\n'
         f.write(output_data)
+    time.sleep(3)
