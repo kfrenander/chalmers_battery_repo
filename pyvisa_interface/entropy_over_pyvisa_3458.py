@@ -40,4 +40,4 @@ while time.time() < start_time + 10:
         print(f'Resistance measurement failed at {meas_timestamp}')
         meas_fres = np.nan
 
-    print(f'\rLatest measurement: {meas_current:.2e} and {meas_voltage:.2e}')
+    print(f'\rLatest measurement:\n\t current: {meas_current:.2e}A\n\tVoltage:{meas_voltage:.2e}V\n\tResistance:{meas_fres}')
