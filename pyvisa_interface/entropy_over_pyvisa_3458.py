@@ -6,6 +6,8 @@ import numpy as np
 rm = pyvisa.ResourceManager()
 devices = rm.list_resources()
 
+op_file = '/data/entropy-logs/entropy-measurement-1'
+
 instr21 = 'GPIB0::21::INSTR'
 instr22 = 'GPIB0::22::INSTR'
 instr25 = 'GPIB0::25::INSTR'
@@ -40,4 +42,7 @@ while time.time() < start_time + 10:
         print(f'Resistance measurement failed at {meas_timestamp}')
         meas_fres = np.nan
 
-    print(f'\rLatest measurement:\n\t current: {meas_current:.2e}A\n\tVoltage:{meas_voltage:.2e}V\n\tResistance:{meas_fres}')
+    print(f'\rLatest measurement:\n\tCurrent: {meas_current:.2e}A\n\tVoltage:{meas_voltage:.2e}V\n\tResistance:{meas_fres}')
+    with open(op_file, 'a+', buffering=1) as f:
+        output_data = f'{meas_timestamp}, {meas_voltage}, {meas_current}, {meas_fres}\n'
+        f.write(output_data)
