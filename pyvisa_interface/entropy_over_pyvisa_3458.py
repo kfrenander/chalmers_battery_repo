@@ -15,3 +15,7 @@ obj25 = rm.open_resource(instr25)
 
 obj21.write('END ALWAYS')
 obj22.write('END ALWAYS')
+
+meas_curren = obj21.query('DCI?')
+meas_voltage = obj22.query('DCV?')
+print(f'\rLatest measurement: {meas_curren} and {meas_voltage}')
