@@ -164,8 +164,12 @@ class LgRptData(BaseRptData):
 
 
 if __name__ == '__main__':
+    from check_current_os import get_base_path_batt_lab_data
+    import os
     outer_tic = dt.datetime.now()
-    stat_test = r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\cycling_data"
-    test_case = LgNewareDataSet(stat_test)
+    BASE_PATH = get_base_path_batt_lab_data()
+    stat_test = "stat_test/cycling_data"
+    pulse_charge = "pulse_chrg_test/cycling_data_ici"
+    test_case = LgNewareDataSet(os.path.join(BASE_PATH, pulse_charge))
     outer_toc = dt.datetime.now()
     print('Total elapsed time was {:.2f} min.'.format((outer_toc - outer_tic).total_seconds() / 60))
