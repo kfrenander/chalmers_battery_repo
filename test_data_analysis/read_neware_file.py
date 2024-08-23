@@ -190,6 +190,8 @@ def read_neware_80_xls(fname, curr_unit='milli'):
 
 
 if __name__ == '__main__':
+    from check_current_os import get_base_path_batt_lab_data
+    import os
     # my_files = [r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-1-2818574078.xls",
     #             r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-2-2818574077.xls",
     #             r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-3-2818574078.xls"]
@@ -198,5 +200,6 @@ if __name__ == '__main__':
     #     'tesla_neg': read_neware_xls(my_files[1]),
     #     'green_neg': read_neware_xls(my_files[2])
     # }
-    test_file_v80 = r"\\sol.ita.chalmers.se\groups\batt_lab_data\HaliBatt\SiGr_Materials\240072-1-1-2818575898.xlsx"
+    BASE_PATH_BATTLABDATA = get_base_path_batt_lab_data()
+    test_file_v80 = os.path.join(BASE_PATH_BATTLABDATA, 'pulse_chrg_test/cycling_data_ici/240095-3-1-2818575237.xlsx')
     df = read_neware_80_xls(test_file_v80)
