@@ -427,4 +427,8 @@ class BaseRptData(object):
 
 
 if __name__ == '__main__':
+    from check_current_os import get_base_path_batt_lab_data
+    BASE_PATH_BATTLABDATA = get_base_path_batt_lab_data()
+    test_dir = os.path.join(BASE_PATH_BATTLABDATA, 'pulse_chrg_test/cycling_data_ici')
+    test_case = BaseNewareDataSet(test_dir)
     test_case = BaseNewareDataSet(r"\\sol.ita.chalmers.se\groups\batt_lab_data\stat_test\cycling_data")
