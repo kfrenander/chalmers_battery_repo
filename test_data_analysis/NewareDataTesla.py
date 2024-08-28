@@ -42,6 +42,8 @@ class TeslaNewareDataSet(BaseNewareDataSet):
                 except MemoryError:
                     print('Running out of RAM')
                     temp_dict[key] = 'Placeholder due to MemoryError'
+                except Exception as e:
+                    print(f'Failed with unexpected error {e}')
             toc = dt.datetime.now()
             print('Time elapsed for test {} was {:.2f} min.'.format(key, (toc-tic).total_seconds() / 60))
         self.data_dict = temp_dict
@@ -52,13 +54,11 @@ class TeslaNewareData(BaseNewareData):
     def __init__(self, list_of_files, n_cores=8):
         super().__init__(list_of_files, n_cores)
         self.test_name = self.look_up_test_name(self.channel_name)
-        self.stat = pd.DataFrame()
-        self.cyc = pd.DataFrame()
-        print('Starting read in')
-        self.xl_files = [pd.ExcelFile(file_name) for file_name in natsorted(self.file_names)]
-        print('Read in of data to pandas finished')
-        BaseNewareData.read_dynamic_data(self)
-        super().read_cycle_statistics()
+        # self.stat = pd.DataFrame()
+        # self.cyc = pd.DataFrame()
+        # self.xl_files = [pd.ExcelFile(file_name) for file_name in natsorted(self.file_names)]
+        # BaseNewareData.read_dynamic_data(self)
+        # super().read_cycle_statistics()
         debug_start = dt.datetime.now()
         df_split = np.array_split(self.dyn_df, n_cores)
         pool = Pool(n_cores)

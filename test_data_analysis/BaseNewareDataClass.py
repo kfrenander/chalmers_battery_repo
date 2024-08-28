@@ -1,3 +1,4 @@
+import sys
 import pandas as pd
 from scipy.integrate import cumtrapz
 import datetime as dt
@@ -6,6 +7,9 @@ import re
 from natsort.natsort import natsorted
 import os
 from collections import OrderedDict
+# from test_data_analysis.read_neware_file import read_neware_xls
+from test_data_analysis.read_neware_files import NewareDataReader
+import time
 
 
 class BaseNewareDataSet(object):
@@ -28,7 +32,7 @@ class BaseNewareDataSet(object):
                 chan_list.append('{2}-{0}-{1}'.format(*[x.strip("-") for x in re.findall(r'-\d+', f) if len(x) < 3],
                                                       unit))
         chan_list = list(set(chan_list))
-        self.chan_file_dict = {k: [os.path.join(data_dir, x) for x in file_list if f'{k}-' in x] for k in
+        self.chan_file_dict = {k: [os.path.join(data_dir, x) for x in file_list if f'{k}-' in x and not '~$' in x] for k in
                                chan_list}
         return None
 
@@ -54,6 +58,18 @@ class BaseNewareData(object):
         self.channel_name = self.make_channel_name()
         self.set_pkl_dir()
         self.test_id = self.find_test_id()
+        tic_read_in = time.time()
+        print(f'Starting read in on {dt.datetime.now():%Y-%m-%d_%H:%M.%S}')
+        self.raw_data_reader = NewareDataReader(self.file_names)
+        self.dyn_df = self.raw_data_reader.read_dynamic_data()
+        self.cyc_df = self.raw_data_reader.read_cycle()
+        self.stat_df = self.raw_data_reader.read_statistics()
+        # self.xl_files = [pd.ExcelFile(file_name, engine='openpyxl') for file_name in natsorted(self.file_names)]
+        # self.dyn_df = read_neware_xls(self.xl_files)
+        toc_read_in = time.time()
+        print(f'Read in of data to pandas finished after {toc_read_in - tic_read_in:.2f} seconds.')
+        # self.neware_version = self.id_neware_version()
+        # self.col_renaming_dct = define_neware_renaming(self.neware_version)
         # self.channel_name = list(set(['{}_{}_{}'.format(*[x.strip('-') for x in re.findall(r'\d+-', file)])
         #                              for file in list_of_files]))[0]
 
@@ -102,7 +118,7 @@ class BaseNewareData(object):
         fname = os.path.join(self.pkl_dir, f'metadata_{self.channel_name}_test_{self.test_id}.txt')
         with open(fname, 'w+') as f:
             for key, value in self.meta_data.items():
-                f.write(f'{key}_ID\t\t\t: {value}\n')
+                f.write(f'{key}\t:\t{value}\n')
         print(f'Metadata written for unit {self.unit_name} and channel {self.machine_id}_{self.channel_id}')
 
     def set_pkl_dir(self):
@@ -150,137 +166,141 @@ class BaseNewareData(object):
         return f'{self.unit_name}_{self.machine_id}_{self.channel_id}'
 
     def find_test_id(self):
-        # Regex pattern to identify only the trailing umber preceded by hyphen
+        # Regex pattern to identify only the trailing number preceded by hyphen
         pattern = r'(?<=-)\d+(?=[^0-9]*$)'
         # Regex pattern will only work if trailing number in file name can be removed, this requires the path to be
         # reduced to only file name
         fnames = [os.path.split(f)[-1] for f in self.file_names]
         list_of_ids = [re.search(pattern, fname.split('_')[0]).group() for fname in fnames]
         return np.unique(list_of_ids)[0]
-
-    def read_dynamic_data(self):
-        df = pd.DataFrame()
-        temperature_df = pd.DataFrame()
-        col_names = ['Measurement', 'mode', 'step', 'arb_step1', 'arb_step2',
-                     'curr', 'volt', 'cap', 'step_egy', 'rel_time', 'abs_time']
-        col_names_temp = ['Measurement', 'mode', 'rel_time', 'abs_time', 'temperature', 'aux_temp']
-        for xl_file in self.xl_files:
-            for sheet in xl_file.sheet_names:
-                if 'detail_' in sheet.lower():
-                    if df.empty:
-                        df = xl_file.parse(sheet, names=col_names)
-                        if df['curr'].abs().max() > 10000:
-                            df.loc[:, 'curr'] = df.loc[:, 'curr'] / 10
-                            df.loc[:, 'cap'] = df.loc[:, 'cap'] / 10
-                            df.loc[:, 'step_egy'] = df.loc[:, 'step_egy'] / 10
-                    else:
-                        temp_df = xl_file.parse(sheet, names=col_names)
-                        if temp_df['curr'].abs().max() > 10000:
-                            temp_df.loc[:, 'curr'] = temp_df.loc[:, 'curr'] / 10
-                            temp_df.loc[:, 'cap'] = temp_df.loc[:, 'cap'] / 10
-                            temp_df.loc[:, 'step_egy'] = temp_df.loc[:, 'step_egy'] / 10
-                        df = df.append(temp_df, ignore_index=True)
-                elif 'detailtemp' in sheet.lower():
-                    if temperature_df.empty:
-                        temperature_df = xl_file.parse(sheet, names=col_names_temp)
-                    else:
-                        tdf = xl_file.parse(sheet, names=col_names_temp)
-                        temperature_df = temperature_df.append(tdf, ignore_index=True)
-        mA = [x for x in df.columns if '(mA)' in x]
-        if df['curr'].abs().max() > 10000:
-            df.loc[:, 'curr'] = df.loc[:, 'curr'] / 10
-            df.loc[:, 'cap'] = df.loc[:, 'cap'] / 10
-            df.loc[:, 'step_egy'] = df.loc[:, 'step_egy'] / 10
-        df['mode'].replace(['搁置', '恒流充电', '恒流恒压充电', '恒流放电'],
-                           ['Rest', 'CC_Chg', 'CCCV_Chg', 'CC_DChg'], inplace=True)
-        df['mode'].replace(['Rest', 'CC Chg', 'CC DChg', 'CCCV Chg'],
-                           ['Rest', 'CC_Chg', 'CC_DChg', 'CCCV_Chg'], inplace=True)
-        df['step_time'] = pd.to_timedelta(df.rel_time)
-        df['abs_time'] = pd.to_datetime(df['abs_time'], format='%Y-%m-%d %H:%M:%S')
-        df['float_time'] = (df.abs_time - df.abs_time[0]).dt.total_seconds().astype(float)
-        try:
-            df.loc[:, 'temperature'] = temperature_df.loc[:, 'temperature']
-        except:
-            print('No temperature measurement available')
-        df['pwr'] = df.curr / 1000 * df.volt
-        df['pwr_chrg'] = df.pwr.mask(df.pwr < 0, 0)
-        df['pwr_dchg'] = df.pwr.mask(df.pwr > 0, 0)
-        df['egy_tot'] = cumtrapz(df.pwr.abs() / (1000*3600), df.float_time, initial=0)
-        df['egy_chrg'] = cumtrapz(df.pwr_chrg.abs() / (1000*3600), df.float_time, initial=0)
-        df['egy_dchg'] = cumtrapz(df.pwr_dchg.abs() / (1000*3600), df.float_time, initial=0)
-        if not df.arb_step2.is_monotonic_increasing:
-            df = self.sum_idx(df, 'arb_step2')
-            # reset_idx = df.arb_step2[df.arb_step2.diff() < 0].index.values[0]
-            # df.loc[reset_idx:, 'arb_step2'] = df.loc[reset_idx:, 'arb_step2'] + df.loc[reset_idx - 1, 'arb_step2']
-            # df.loc[reset_idx:, 'Measurement'] = df.loc[reset_idx:, 'Measurement'] + df.loc[reset_idx - 1, 'Measurement']
-        # df = df.sort_values(by='Measurement')
-        if df['curr'].abs().max() > 100:
-            df['mAh'] = cumtrapz(df.curr, df.float_time, initial=0) / 3600
-            df['curr'] = df.curr / 1000
-        else:
-            df['mAh'] = cumtrapz(df.curr, df.float_time, initial=0) * 1000 / 3600
-            df['cap'] = df['cap'] * 1000
-        self.dyn_df = df
-        return self
-
-    def read_cycle_statistics(self):
-        for xl_file in self.xl_files:
-            for sheet in xl_file.sheet_names:
-                if 'statis' in sheet.lower():
-                    if self.stat.empty:
-                        col_names = [
-                            'Channel',
-                            'CyCle',
-                            'Step',
-                            'Raw Step ID',
-                            'Status',
-                            'Step Voltage(V)',
-                            'End Voltage(V)',
-                            'Start Current(mA)',
-                            'End Current(mA)',
-                            'CapaCity(mAh)',
-                            'Endure Time(h:min:s.ms)',
-                            'Relative Time(h:min:s.ms)',
-                            'Absolute Time',
-                            'Discharge_Capacity(mAh)',
-                            'Charge_Capacity(mAh)',
-                            'Discharge_Capacity(mAh)',
-                            'Net Engy_DChg(mWh)',
-                            'Engy_Chg(mWh)',
-                            'Engy_DChg(mWh)'
-                        ]
-                        self.stat = xl_file.parse(sheet, names=col_names)
-                        print('Statistics df intiated')
-                    else:
-                        print('Statistics df appended')
-                        temp_df = xl_file.parse(sheet)
-                        col_match = {x: y for x, y in zip(temp_df.columns, self.stat.columns)}
-                        self.stat = self.stat.append(temp_df.rename(columns=col_match), ignore_index=True)
-                    t_dur = self.stat['Endure Time(h:min:s.ms)'].apply(lambda x: self.calc_t_delta(x))
-                    self.stat['t_dur'] = t_dur
-                    curr_diff = (self.stat['Start Current(mA)'] - self.stat['End Current(mA)']).abs()
-                    self.stat['curr_diff'] = curr_diff
-                    self.stat['Status'].replace(['搁置', '恒流充电', '恒流恒压充电', '恒流放电'],
-                                                ['Rest', 'CC_Chg', 'CCCV_Chg', 'CC_DChg'], inplace=True)
-                    self.stat = self.sum_idx(self.stat, 'Step')
-                if 'cycle' in sheet.lower():
-                    cyc_names = ['channel', 'cycle', 'chrg_cap', 'dchg_cap', 'cap_decay']
-                    if self.cyc.empty:
-                        self.cyc = xl_file.parse(sheet, names=cyc_names)
-                    else:
-                        temp_df = xl_file.parse(sheet, names=cyc_names)
-                        col_match = {x: y for x, y in zip(temp_df.columns, self.cyc.columns)}
-                        self.cyc = self.cyc.append(temp_df.rename(columns=col_match), ignore_index=True)
-                    # self.cyc.rename(columns={
-                    #     '通道': 'Channel',
-                    #     '循环序号': 'ToTal of Cycle',
-                    #     '充电容量(mAh)': ' Capacity of charge(mAh)',
-                    #     '放电容量(mAh)': 'Capacity of discharge(mAh)',
-                    #     '放电容量衰减率（%）': 'Cycle Life(%)'
-                    # }, inplace=True)
-                    # self.cyc.rename(columns={'ToTal of Cycle': 'cycle'}, inplace=True)
-                    self.cyc = self.sum_idx(self.cyc, 'cycle')
-        return self
+    #
+    # def read_dynamic_data(self):
+    #     df = pd.DataFrame()
+    #     temperature_df = pd.DataFrame()
+    #     col_names = ['Measurement', 'mode', 'step', 'arb_step1', 'arb_step2',
+    #                  'curr', 'volt', 'cap', 'step_egy', 'rel_time', 'abs_time']
+    #     col_names_temp = ['Measurement', 'mode', 'rel_time', 'abs_time', 'temperature', 'aux_temp']
+    #     for xl_file in self.xl_files:
+    #         for sheet in xl_file.sheet_names:
+    #             if 'detail_' in sheet.lower():
+    #                 if df.empty:
+    #                     df = xl_file.parse(sheet, names=col_names)
+    #                     if df['curr'].abs().max() > 10000:
+    #                         df.loc[:, 'curr'] = df.loc[:, 'curr'] / 10
+    #                         df.loc[:, 'cap'] = df.loc[:, 'cap'] / 10
+    #                         df.loc[:, 'step_egy'] = df.loc[:, 'step_egy'] / 10
+    #                 else:
+    #                     temp_df = xl_file.parse(sheet, names=col_names)
+    #                     if temp_df['curr'].abs().max() > 10000:
+    #                         temp_df.loc[:, 'curr'] = temp_df.loc[:, 'curr'] / 10
+    #                         temp_df.loc[:, 'cap'] = temp_df.loc[:, 'cap'] / 10
+    #                         temp_df.loc[:, 'step_egy'] = temp_df.loc[:, 'step_egy'] / 10
+    #                     # df = df.append(temp_df, ignore_index=True)
+    #                     df = pd.concat([df, temp_df], ignore_index=True)
+    #             elif 'detailtemp' in sheet.lower():
+    #                 if temperature_df.empty:
+    #                     temperature_df = xl_file.parse(sheet, names=col_names_temp)
+    #                 else:
+    #                     tdf = xl_file.parse(sheet, names=col_names_temp)
+    #                     # temperature_df = temperature_df.append(tdf, ignore_index=True)
+    #                     temperature_df = pd.concat([temperature_df, tdf], ignore_index=True)
+    #     mA = [x for x in df.columns if '(mA)' in x]
+    #     if df['curr'].abs().max() > 10000:
+    #         df.loc[:, 'curr'] = df.loc[:, 'curr'] / 10
+    #         df.loc[:, 'cap'] = df.loc[:, 'cap'] / 10
+    #         df.loc[:, 'step_egy'] = df.loc[:, 'step_egy'] / 10
+    #     df['mode'].replace(['搁置', '恒流充电', '恒流恒压充电', '恒流放电'],
+    #                        ['Rest', 'CC_Chg', 'CCCV_Chg', 'CC_DChg'], inplace=True)
+    #     df['mode'].replace(['Rest', 'CC Chg', 'CC DChg', 'CCCV Chg'],
+    #                        ['Rest', 'CC_Chg', 'CC_DChg', 'CCCV_Chg'], inplace=True)
+    #     df['step_time'] = pd.to_timedelta(df.rel_time)
+    #     df['abs_time'] = pd.to_datetime(df['abs_time'], format='%Y-%m-%d %H:%M:%S')
+    #     df['float_time'] = (df.abs_time - df.abs_time[0]).dt.total_seconds().astype(float)
+    #     try:
+    #         df.loc[:, 'temperature'] = temperature_df.loc[:, 'temperature']
+    #     except:
+    #         print('No temperature measurement available')
+    #     df['pwr'] = df.curr / 1000 * df.volt
+    #     df['pwr_chrg'] = df.pwr.mask(df.pwr < 0, 0)
+    #     df['pwr_dchg'] = df.pwr.mask(df.pwr > 0, 0)
+    #     df['egy_tot'] = cumtrapz(df.pwr.abs() / (1000*3600), df.float_time, initial=0)
+    #     df['egy_chrg'] = cumtrapz(df.pwr_chrg.abs() / (1000*3600), df.float_time, initial=0)
+    #     df['egy_dchg'] = cumtrapz(df.pwr_dchg.abs() / (1000*3600), df.float_time, initial=0)
+    #     if not df.arb_step2.is_monotonic_increasing:
+    #         df = self.sum_idx(df, 'arb_step2')
+    #         # reset_idx = df.arb_step2[df.arb_step2.diff() < 0].index.values[0]
+    #         # df.loc[reset_idx:, 'arb_step2'] = df.loc[reset_idx:, 'arb_step2'] + df.loc[reset_idx - 1, 'arb_step2']
+    #         # df.loc[reset_idx:, 'Measurement'] = df.loc[reset_idx:, 'Measurement'] + df.loc[reset_idx - 1, 'Measurement']
+    #     # df = df.sort_values(by='Measurement')
+    #     if df['curr'].abs().max() > 100:
+    #         df['mAh'] = cumtrapz(df.curr, df.float_time, initial=0) / 3600
+    #         df['curr'] = df.curr / 1000
+    #     else:
+    #         df['mAh'] = cumtrapz(df.curr, df.float_time, initial=0) * 1000 / 3600
+    #         df['cap'] = df['cap'] * 1000
+    #     self.dyn_df = df
+    #     return self
+    #
+    # def read_cycle_statistics(self):
+    #     for xl_file in self.xl_files:
+    #         for sheet in xl_file.sheet_names:
+    #             if 'statis' in sheet.lower():
+    #                 if self.stat_df.empty:
+    #                     col_names = [
+    #                         'Channel',
+    #                         'CyCle',
+    #                         'Step',
+    #                         'Raw Step ID',
+    #                         'Status',
+    #                         'Step Voltage(V)',
+    #                         'End Voltage(V)',
+    #                         'Start Current(mA)',
+    #                         'End Current(mA)',
+    #                         'CapaCity(mAh)',
+    #                         'Endure Time(h:min:s.ms)',
+    #                         'Relative Time(h:min:s.ms)',
+    #                         'Absolute Time',
+    #                         'Discharge_Capacity(mAh)',
+    #                         'Charge_Capacity(mAh)',
+    #                         'Discharge_Capacity(mAh)',
+    #                         'Net Engy_DChg(mWh)',
+    #                         'Engy_Chg(mWh)',
+    #                         'Engy_DChg(mWh)'
+    #                     ]
+    #                     self.stat_df = xl_file.parse(sheet, names=col_names)
+    #                     print('Statistics df intiated')
+    #                 else:
+    #                     print('Statistics df appended')
+    #                     temp_df = xl_file.parse(sheet)
+    #                     col_match = {x: y for x, y in zip(temp_df.columns, self.stat_df.columns)}
+    #                     self.stat_df = pd.concat([self.stat_df, temp_df.rename(columns=col_match)], ignore_index=True)
+    #                     # self.stat = self.stat.append(temp_df.rename(columns=col_match), ignore_index=True)
+    #                 t_dur = self.stat_df['Endure Time(h:min:s.ms)'].apply(lambda x: self.calc_t_delta(x))
+    #                 self.stat_df['t_dur'] = t_dur
+    #                 curr_diff = (self.stat_df['Start Current(mA)'] - self.stat_df['End Current(mA)']).abs()
+    #                 self.stat_df['curr_diff'] = curr_diff
+    #                 self.stat_df['Status'].replace(['搁置', '恒流充电', '恒流恒压充电', '恒流放电'],
+    #                                                ['Rest', 'CC_Chg', 'CCCV_Chg', 'CC_DChg'], inplace=True)
+    #                 self.stat_df = self.sum_idx(self.stat_df, 'Step')
+    #             if 'cycle' in sheet.lower():
+    #                 cyc_names = ['channel', 'cycle', 'chrg_cap', 'dchg_cap', 'cap_decay']
+    #                 if self.cyc_df.empty:
+    #                     self.cyc_df = xl_file.parse(sheet, names=cyc_names)
+    #                 else:
+    #                     temp_df = xl_file.parse(sheet, names=cyc_names)
+    #                     col_match = {x: y for x, y in zip(temp_df.columns, self.cyc_df.columns)}
+    #                     self.cyc_df = pd.concat([self.cyc_df, temp_df.rename(columns=col_match)], ignore_index=True)
+    #                     # self.cyc = self.cyc.append(temp_df.rename(columns=col_match), ignore_index=True)
+    #                 # self.cyc.rename(columns={
+    #                 #     '通道': 'Channel',
+    #                 #     '循环序号': 'ToTal of Cycle',
+    #                 #     '充电容量(mAh)': ' Capacity of charge(mAh)',
+    #                 #     '放电容量(mAh)': 'Capacity of discharge(mAh)',
+    #                 #     '放电容量衰减率（%）': 'Cycle Life(%)'
+    #                 # }, inplace=True)
+    #                 # self.cyc.rename(columns={'ToTal of Cycle': 'cycle'}, inplace=True)
+    #                 self.cyc_df = self.sum_idx(self.cyc_df, 'cycle')
+    #     return self
 
     @staticmethod
     def sum_idx(df, col):
@@ -293,56 +313,73 @@ class BaseNewareData(object):
 
     def find_rpt_dict(self):
         # Find rest steps which have rpt duration (15 minutes).
-        start_idx = self.step_char[(self.step_char.step_duration == 28) &
-                                   (self.step_char.step_mode == 'Rest')].index
-        stop_idx = self.step_char[(self.step_char.step_duration == 34) &
-                                  (self.step_char.step_mode == 'Rest')].index
-        if stop_idx.empty:
-            rpt_rest_steps = self.step_char[(self.step_char.step_mode == 'Rest') & (self.step_char.step_duration == 900)]
-            # Find discharge steps that are long enough to be RPT and C/3 (only present in RPT)
-            long_dchg_steps = self.step_char[(self.step_char.step_duration > 4000) & (abs(self.step_char.curr + 1.53) < 0.2)]
-            pulse_chrg_steps = self.step_char[(self.step_char.curr > 5.5) & (self.step_char.step_duration == 10)]
+        if self.raw_data_reader.ver_id == 'v76':
+            start_idx = self.step_char[(self.step_char.step_duration == 28) &
+                                       (self.step_char.step_mode == 'Rest')].index
+            stop_idx = self.step_char[(self.step_char.step_duration == 34) &
+                                      (self.step_char.step_mode == 'Rest')].index
+            if stop_idx.empty:
+                rpt_rest_steps = self.step_char[
+                    (self.step_char.step_mode == 'Rest') & (self.step_char.step_duration == 900)]
+                # Find discharge steps that are long enough to be RPT and C/3 (only present in RPT)
+                long_dchg_steps = self.step_char[
+                    (self.step_char.step_duration > 4000) & (abs(self.step_char.curr + 1.53) < 0.2)]
+                pulse_chrg_steps = self.step_char[(self.step_char.curr > 5.5) & (self.step_char.step_duration == 10)]
 
-            # From rest steps, find the ones that are far enough apart to signify new rpt has started
-            new_rpt_step = rpt_rest_steps[rpt_rest_steps.step_nbr.diff() > 90].step_nbr.tolist()
-            new_rpt_step.append(self.dyn_df.arb_step2.max())
-            stop_idx = [int(rpt_rest_steps[rpt_rest_steps.step_nbr < int(val)].last_valid_index()) for val in new_rpt_step]
+                # From rest steps, find the ones that are far enough apart to signify new rpt has started
+                new_rpt_step = rpt_rest_steps[rpt_rest_steps.step_nbr.diff() > 90].step_nbr.tolist()
+                new_rpt_step.append(self.dyn_df.arb_step2.max())
+                stop_idx = [int(rpt_rest_steps[rpt_rest_steps.step_nbr < int(val)].last_valid_index()) for val in
+                            new_rpt_step]
 
-            pulse_idx = pulse_chrg_steps.index.to_numpy()
-            # dchg_30_soc_idx = self.step_char.loc[pulse_idx - 1, :][self.step_char.loc[pulse_idx - 1, 'minV'] < 3.46].index
-            dchg_30_soc_idx = self.step_char.loc[pulse_idx - 4, :][self.step_char.loc[pulse_idx - 4, 'minV'] < 3.5].index
-            stop_idx = dchg_30_soc_idx + 7
+                pulse_idx = pulse_chrg_steps.index.to_numpy()
+                # dchg_30_soc_idx = self.step_char.loc[pulse_idx - 1, :][self.step_char.loc[pulse_idx - 1, 'minV'] < 3.46].index
+                dchg_30_soc_idx = self.step_char.loc[pulse_idx - 4, :][
+                    self.step_char.loc[pulse_idx - 4, 'minV'] < 3.5].index
+                stop_idx = dchg_30_soc_idx + 7
 
+                # Similary find the long discharge steps far enough apart.
+                # start_idx = long_dchg_steps[long_dchg_steps.step_nbr.diff().fillna(200) > 100].step_nbr.values.tolist()
+                start_idx = long_dchg_steps[long_dchg_steps.stp_date.diff().fillna(dt.timedelta(days=15)) >
+                                            dt.timedelta(days=3)].index
 
-            # Similary find the long discharge steps far enough apart.
-            # start_idx = long_dchg_steps[long_dchg_steps.step_nbr.diff().fillna(200) > 100].step_nbr.values.tolist()
-            start_idx = long_dchg_steps[long_dchg_steps.stp_date.diff().fillna(dt.timedelta(days=15)) >
-                                        dt.timedelta(days=3)].index
+            stop_idx = stop_idx.drop_duplicates()
+            start_idx = start_idx.drop_duplicates()
 
-        stop_idx = stop_idx.drop_duplicates()
-        start_idx = start_idx.drop_duplicates()
+            # Since some tests do not properly start from scratch the first found RPT might be the second, so this must be
+            # kept despite not fulfilling the diff requirement.
+            if start_idx[0] > stop_idx[0]:
+                start_idx.insert(0, int(long_dchg_steps.first_valid_index()))
 
+            # All tests should start with rpt
+            # if start_idx[0] > 10:
+            #     start_idx.insert(0, 0)
 
-        # Since some tests do not properly start from scratch the first found RPT might be the second, so this must be
-        # kept despite not fulfilling the diff requirement.
-        if start_idx[0] > stop_idx[0]:
-            start_idx.insert(0, int(long_dchg_steps.first_valid_index()))
+            # Some test show inexplicable c/3 discharges and 15 minute rests that must sorted out
+            for i, idx in enumerate(start_idx):
+                if stop_idx[i] - start_idx[i] < 20:
+                    stop_idx.pop(i)
+                    start_idx.pop(i)
 
-        # All tests should start with rpt
-        # if start_idx[0] > 10:
-        #     start_idx.insert(0, 0)
+            # Sample out the dynamic data between each of the start and stop indices
+            rpt_dict = {'rpt_{}'.format(i + 1): self.dyn_df[(self.dyn_df.arb_step2 > start_idx[i]) &
+                                                            (self.dyn_df.arb_step2 < stop_idx[i])]
+                        for i in range(len(stop_idx)) if stop_idx[i] - start_idx[i] > 20}
+            rpt_dict = {k: v for k, v in rpt_dict.items() if not v.empty}
+        else:
+            start_idx = self.stat_df[(self.stat_df['step_duration_float'] == 28) &
+                                     (self.stat_df['mode'] == 'Rest')][['arb_step1', 'arb_step2']]
+            stop_idx = self.stat_df[(self.stat_df['step_duration_float'] == 34) &
+                                     (self.stat_df['mode'] == 'Rest')][['arb_step1', 'arb_step2']]
+            rpt_dict = {}
+            for i in range(stop_idx.shape[0]):
+                key_val = f'rpt_{i + 1}'
+                intermediate = self.dyn_df[(self.dyn_df['arb_step2'] >= start_idx['arb_step2'].iloc[i]) &
+                                           (self.dyn_df['arb_step2'] <= stop_idx['arb_step2'].iloc[i])]
+                rpt_dict[key_val] = intermediate[(intermediate['arb_step1'] >= start_idx['arb_step1'].iloc[i]) &
+                                                 (intermediate['arb_step1'] <= stop_idx['arb_step1'].iloc[i])]
+            rpt_dict = {k: v for k, v in rpt_dict.items() if not v.empty}
 
-        # Some test show inexplicable c/3 discharges and 15 minute rests that must sorted out
-        for i, idx in enumerate(start_idx):
-            if stop_idx[i] - start_idx[i] < 20:
-                stop_idx.pop(i)
-                start_idx.pop(i)
-
-        # Sample out the dynamic data between each of the start and stop indices
-        rpt_dict = {'rpt_{}'.format(i + 1): self.dyn_df[(self.dyn_df.arb_step2 > start_idx[i]) &
-                                                        (self.dyn_df.arb_step2 < stop_idx[i])]
-                    for i in range(len(stop_idx)) if stop_idx[i] - start_idx[i] > 20}
-        rpt_dict = {k: v for k, v in rpt_dict.items() if not v.empty}
         return rpt_dict
 
     def find_ica_steps(self):
