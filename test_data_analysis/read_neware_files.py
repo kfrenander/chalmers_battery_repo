@@ -2,8 +2,9 @@ import pandas as pd
 import numpy as np
 import sys
 from scipy.integrate import cumtrapz
-from test_data_analysis.neware_column_mapper import define_neware_renaming
+from test_data_analysis.neware_column_mapper import define_neware_renaming, define_neware_translation_dict
 import warnings
+import re
 
 
 class NewareDataReader:
@@ -13,6 +14,7 @@ class NewareDataReader:
         self.xl_files = []
         self.ver_id = None
         self.col_rename_dict = None
+        self.chinese = False
 
         # Load the Excel files and identify the version
         self._load_files()
@@ -23,7 +25,7 @@ class NewareDataReader:
         if isinstance(self.file_paths, str):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                self.xl_files = [pd.ExcelFile(self.file_paths, engine='openpyxl')]
+                self.xl_files = [pd.ExcelFile(self.file_paths)]
         elif isinstance(self.file_paths, pd.ExcelFile):
             self.xl_files = [self.file_paths]
         elif isinstance(self.file_paths, list):
@@ -46,6 +48,12 @@ class NewareDataReader:
             print('Unknown Neware format, please check file/-s')
             sys.exit()
 
+    def _id_language(self, df):
+        if all([self._contains_chinese_characters(col) for col in df.columns]):
+            self.chinese = True
+        else:
+            pass
+
     def read_dynamic_data(self):
         if self.ver_id == 'v80':
             df_lst = [self._read_neware_v80_xls(xl_file) for xl_file in self.xl_files]
@@ -64,6 +72,10 @@ class NewareDataReader:
         elif self.ver_id == 'v76':
             stat_sheet = [sh_name for sh_name in self.xl_files[0].sheet_names if 'Statis_' in sh_name]
             stat_df = self.xl_files[0].parse(stat_sheet[0])
+        self._id_language(stat_df)
+        if self.chinese:
+            stat_df = self._translate_column_names(stat_df)
+            stat_df = self._translate_mode_names(stat_df)
         stat_df = self._rename_df_columns(stat_df)
         stat_df['step_duration'] = pd.to_timedelta(stat_df['step_duration'])
         stat_df['step_duration_float'] = stat_df['step_duration'].apply(lambda x: x.total_seconds())
@@ -75,6 +87,9 @@ class NewareDataReader:
         elif self.ver_id == 'v76':
             cycle_sheet = [sh_name for sh_name in self.xl_files[0].sheet_names if 'Cycle' in sh_name]
             cycle_df = self.xl_files[0].parse(cycle_sheet[0])
+        self._id_language(cycle_df)
+        if self.chinese:
+            cycle_df = self._translate_column_names(cycle_df)
         cycle_df = self._rename_df_columns(cycle_df)
         return cycle_df
 
@@ -86,6 +101,10 @@ class NewareDataReader:
             for k, aux_df in aux_ch_df_dct.items():
                 shared_cols = list(set(df.columns) & set(aux_df.columns))
                 df = pd.merge(df, aux_df, on=shared_cols)
+        self._id_language(df)
+        if self.chinese:
+            df = self._translate_column_names(df)
+            df = self._translate_mode_names(df)
         df['arb_step2'] = (df['Step Index'].diff() != 0).cumsum()
         df = self._process_dataframe(df)
         df = self._update_dataframe_times(df)
@@ -99,12 +118,18 @@ class NewareDataReader:
         for sheet in main_sheet:
             df = xl_file.parse(sheet)
 
+        self._id_language(df)
+        if self.chinese:
+            df = self._translate_column_names(df)
+            df = self._translate_mode_names(df)
         df = self._process_dataframe(df)
 
         if aux_sheets:
             aux_df_lst = [xl_file.parse(sheet) for sheet in aux_sheets]
             for aux_df in aux_df_lst:
                 aux_df = self._rename_df_columns(aux_df)
+                if self.chinese:
+                    aux_df = self._translate_column_names(aux_df)
                 shared_cols = list(set(df.columns) & set(aux_df.columns))
                 df = pd.merge(df, aux_df, on=shared_cols)
         df = self._update_dataframe_times(df)
@@ -112,6 +137,27 @@ class NewareDataReader:
         if self.calc_c_rate:
             self._calculate_c_rate(df)
 
+        return df
+
+    def _contains_chinese_characters(self, s):
+        # Chinese character Unicode ranges
+        chinese_char_pattern = re.compile('[\u4e00-\u9fff]')
+        return bool(chinese_char_pattern.search(s))
+
+    def _translate_column_names(self, df):
+        if self.chinese:
+            ch_eng_translation = define_neware_translation_dict(self.ver_id)
+            df.columns = [ch_eng_translation[c] for c in df.columns]
+            return df
+        else:
+            return df
+
+    def _translate_mode_names(self, df):
+        mode_column = [col for col in df.columns
+                       if any(df[col].apply(lambda x: self._contains_chinese_characters(str(x))))][0]
+        mode_translation_dict = dict(zip(['搁置', '恒流充电', '恒流恒压充电', '恒流放电', '恒流恒压放电'],
+                                         ['Rest', 'CC_Chg', 'CCCV_Chg', 'CC_DChg', 'CCCV_DChg']))
+        df[mode_column] = df[mode_column].replace(mode_translation_dict)
         return df
 
     def _process_dataframe(self, df):
@@ -217,6 +263,7 @@ if __name__ == '__main__':
     test_file_v80 = os.path.join(BASE_PATH_BATTLABDATA,
                                  'pulse_chrg_test/cycling_data_ici/debug_case/240095-3-1-2818575237-debug_mwe.xlsx')
     test_file_v76 = os.path.join(BASE_PATH_BATTLABDATA, "pulse_chrg_test/cycling_data/240095-3-7-2818575230.xlsx")
+    test_file_76_ch = r"Z:\Provning\Neware\ICI_test_127.0.0.1_240119-2-8-100.xls"
     test_files_combine = [
         "pulse_chrg_test/cycling_data/240095-3-1-2818575227.xlsx",
         "pulse_chrg_test/cycling_data/240095-3-1-2818575227_1..xlsx",
@@ -228,6 +275,10 @@ if __name__ == '__main__':
     stat_df = reader.read_statistics()
     cycle_df = reader.read_cycle()
     print(df_76.tail())
+    read_ch = NewareDataReader(test_file_76_ch)
+    df_ch = read_ch.read_dynamic_data()
+    stat_ch = read_ch.read_statistics()
+    cyc_ch = read_ch.read_cycle()
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         xl_reader = NewareDataReader(pd.ExcelFile(test_file_v76, engine='openpyxl'))

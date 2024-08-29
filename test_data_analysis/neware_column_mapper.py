@@ -236,3 +236,84 @@ def define_neware_renaming(version_key):
     else:
         print('Unknown neware version, not able to return renaming dictionary.')
         return None
+
+
+def define_neware_translation_dict(version_key):
+    if version_key == 'v80':
+        chinese_names = []
+        english_names = []
+        return dict(zip(chinese_names, english_names))
+    elif version_key == 'v76':
+        chinese_names = ['通道',
+                         '循环序号',
+                         '充电容量(mAh)',
+                         '放电容量(mAh)',
+                         '放电容量衰减率（%）',
+                         '通道',
+                         '循环',
+                         '步次',
+                         '原始步次',
+                         '状态',
+                         '起始电压(V)',
+                         '结束电压(V)',
+                         '起始电流(mA)',
+                         '结束电流(mA)',
+                         '容量(mAh)',
+                         '持续时间(h:min:s.ms)',
+                         '相对时间(h:min:s.ms)',
+                         '绝对时间',
+                         '净放电容量(mAh)',
+                         '充电容量(mAh)',
+                         '放电容量(mAh)',
+                         '净放电能量(mWh)',
+                         '充电能量(mWh)',
+                         '放电能量(mWh)',
+                         '记录序号',
+                         '状态',
+                         '跳转',
+                         '循环',
+                         '步次',
+                         '电流(mA)',
+                         '电压(V)',
+                         '容量(mAh)',
+                         '能量(mWh)',
+                         '相对时间(h:min:s.ms)',
+                         '绝对时间'
+                         ]
+        english_names = ['Channel',
+                         'Cycle number',
+                         'Charge Cap.(mAh)',
+                         'DChg cap .(mAh)',
+                         'Discharge capacity decay rate(%)',
+                         'Channel',
+                         'Cycle',
+                         'Steps',
+                         'Original step',
+                         'State',
+                         'Start Volt(V)',
+                         'End voltage(V)',
+                         'Starting current(mA)',
+                         'Termination current(mA)',
+                         'Capacity(mAh)',
+                         'Continuous time(h:min:s.ms)',
+                         'Relative Time(h:min:s.ms)',
+                         'Real time',
+                         'Net discharge capacity(mAh)',
+                         'Charge Cap.(mAh)',
+                         'DChg cap .(mAh)',
+                         'Net discharge energy(mWh)',
+                         'Chg Eng.(mWh)',
+                         'Discharge energy(mWh)',
+                         'Record number',
+                         'State',
+                         'Jump',
+                         'Cycle',
+                         'Steps',
+                         'Current(mA)',
+                         'Voltage(V)',
+                         'Capacity(mAh)',
+                         'Energy(mWh)',
+                         'Relative Time(h:min:s.ms)',
+                         'Real time(h:min:s.ms)'
+                         ]
+        return dict(zip(chinese_names, english_names))
