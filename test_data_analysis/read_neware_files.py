@@ -86,7 +86,7 @@ class NewareDataReader:
             for k, aux_df in aux_ch_df_dct.items():
                 shared_cols = list(set(df.columns) & set(aux_df.columns))
                 df = pd.merge(df, aux_df, on=shared_cols)
-
+        df['arb_step2'] = (df['Step Index'].diff() != 0).cumsum()
         df = self._process_dataframe(df)
         df = self._update_dataframe_times(df)
         df['float_time'] = pd.to_timedelta(df['total_time']).astype('int64') / 1e9
@@ -205,17 +205,17 @@ if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
     import time
     import os
+    import datetime as dt
 
-    # my_files = [r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-1-2818574078.xls",
-    #             r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-2-2818574077.xls",
-    #             r"C:\Users\krifren\TestData\HalfCellData\AbVolvoData\240093-1-3-2818574078.xls"]
     # dfs = {
     #     'tesla_pos': read_neware_xls(my_files[0], calc_c_rate=True),
     #     'tesla_neg': read_neware_xls(my_files[1]),
     #     'green_neg': read_neware_xls(my_files[2])
     # }
+    print(f'Data read in started at {dt.datetime.now():%Y-%m-%d__%H:%M.%S}.')
     BASE_PATH_BATTLABDATA = get_base_path_batt_lab_data()
-    test_file_v80 = os.path.join(BASE_PATH_BATTLABDATA, 'pulse_chrg_test/cycling_data_ici/240095-3-1-2818575237.xlsx')
+    test_file_v80 = os.path.join(BASE_PATH_BATTLABDATA,
+                                 'pulse_chrg_test/cycling_data_ici/debug_case/240095-3-1-2818575237-debug_mwe.xlsx')
     test_file_v76 = os.path.join(BASE_PATH_BATTLABDATA, "pulse_chrg_test/cycling_data/240095-3-7-2818575230.xlsx")
     test_files_combine = [
         "pulse_chrg_test/cycling_data/240095-3-1-2818575227.xlsx",
@@ -233,12 +233,12 @@ if __name__ == '__main__':
         xl_reader = NewareDataReader(pd.ExcelFile(test_file_v76, engine='openpyxl'))
         df_76_fromxl = xl_reader.read_dynamic_data()
         print(df_76_fromxl.tail())
-    # tic = time.time()
-    # combine_reader = NewareDataReader(test_files_combine)
-    # df_comb = combine_reader.read_dynamic_data()
-    # toc = time.time()
-    # print(df_comb.tail())
-    # print(f'Time elapsed to read combined df is {toc - tic:.2f} seconds')
+    tic = time.time()
+    combine_reader = NewareDataReader(test_files_combine)
+    df_comb = combine_reader.read_dynamic_data()
+    toc = time.time()
+    print(df_comb.tail())
+    print(f'Time elapsed to read combined df is {toc - tic:.2f} seconds')
     tic = time.time()
     v80_reader = NewareDataReader(test_file_v80)
     df_80 = v80_reader.read_dynamic_data()

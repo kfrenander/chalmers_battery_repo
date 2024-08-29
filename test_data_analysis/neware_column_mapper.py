@@ -76,11 +76,12 @@ def define_neware_renaming(version_key):
                          'Plat. Time',
                          'T1 Minimum temperature of discharging(℃)',
                          'Plat. Cap.(mAh)',
-                         'Chg.-DChg. Eff(%)'
+                         'Chg.-DChg. Eff(%)',
+                         'arb_step2'
         ]
         local_names = ['measurement',
-                       'arb_step1',
-                       'arb_step2',
+                       'cyc_step1',
+                       'orig_step',
                        'mode',
                        'rel_time',
                        'total_time',
@@ -154,7 +155,8 @@ def define_neware_renaming(version_key):
                        'Plat. Time',
                        'T_min_dchg',
                        'Plat. Cap.(mAh)',
-                       'chrg_dchg_eff'
+                       'chrg_dchg_eff',
+                       'arb_step2'
                        ]
         return dict(zip(neware_native, local_names))
     elif version_key == 'v76':

@@ -1,31 +1,25 @@
-import sys
-from test_data_analysis.BaseNewareDataClass import BaseNewareDataSet, BaseNewareData, BaseRptData
-import os
-import re
-import pandas as pd
 import datetime as dt
-from natsort.natsort import natsorted
-import numpy as np
-from test_data_analysis.rpt_analysis import characterise_steps
-from multiprocessing import Pool
-import pickle
 import glob
+import re
+import time
+import pandas as pd
+from test_data_analysis.BaseNewareDataClass import BaseNewareDataSet, BaseNewareData, BaseRptData
 
 
 class LgNewareDataSet(BaseNewareDataSet):
 
-    def __init__(self, dir):
-        super().__init__(dir)
+    def __init__(self, neware_data_dir):
+        super().__init__(neware_data_dir)
         self.fill_data()
 
     def fill_data(self):
         temp_dict = {}
         for key, itm_lst in self.chan_file_dict.items():
             # remaining_list = ['2-2']  #['1-1', '1-3', '1-5', '1-6', '2-1', '2-5', '2-6']
-            #if any(s in key for s in remaining_list):
+            # if any(s in key for s in remaining_list):
             root_dir = os.path.split(itm_lst[0])[0]
-            chan_id = re.findall(r'\b\d\b', key)
-            chan_number = '_'.join(chan_id)
+            # chan_id = re.findall(r'\b\d\b', key)
+            # chan_number = '_'.join(chan_id)
             # exp_name = f'pickle_files_channel_{chan_number}'
             exp_name = f'pickle_files_channel_{key}'
             print(f'Calling Neware data with {key}')
@@ -46,14 +40,14 @@ class LgNewareDataSet(BaseNewareDataSet):
                     print('Probably not enough memory')
                     print(e)
                     temp_dict[key] = 'Placeholder due to OSError'
-                except MemoryError:
-                    print('Running out of RAM')
+                except MemoryError as e:
+                    print(f'MemoryError with message {e}')
                     temp_dict[key] = 'Placeholder due to MemoryError'
             # except:
             #     print('General error')
             #     temp_dict[key] = 'Placeholder due to unknown error'
             toc = dt.datetime.now()
-            print(f'Time elapsed for test {key} was {(toc-tic).total_seconds() / 60:.2f} min.\n\n')
+            print(f'Time elapsed for test {key} was {(toc - tic).total_seconds() / 60:.2f} min.\n\n')
         self.data_dict = temp_dict
         return None
 
@@ -62,26 +56,21 @@ class LgNewareData(BaseNewareData):
     def __init__(self, list_of_files, n_cores=8):
         super().__init__(list_of_files, n_cores)
         self.test_name = self.look_up_test_name(self.channel_name)
-        self.stat = pd.DataFrame()
-        self.cyc = pd.DataFrame()
-        print('Starting read in')
-        self.xl_files = [pd.ExcelFile(file_name) for file_name in natsorted(self.file_names)]
-        print('Read in of data to pandas finished')
-        BaseNewareData.read_dynamic_data(self)
-        super().read_cycle_statistics()
-        debug_start = dt.datetime.now()
-        df_split = np.array_split(self.dyn_df, n_cores)
-        pool = Pool(n_cores)
-        self.step_char = pd.concat(pool.map(characterise_steps, df_split))
-        pool.close()
-        pool.join()
-        print('Time for characterisation was {} seconds.'.format((dt.datetime.now() - debug_start).seconds))
+        debug_start = time.time()
+        super().step_characteristics()
+        # df_split = np.array_split(self.dyn_df, n_cores)
+        # pool = Pool(n_cores)
+        # self.step_char = pd.concat(pool.map(characterise_steps, df_split))
+        # pool.close()
+        # pool.join()
+        print(f'Time for characterisation was {time.time() - debug_start:.2f} seconds.')
+        super().find_ici_steps()
         super().find_ica_steps()
         self.rpt_analysis = LgRptData(self.find_rpt_dict(), self.ica_step_list)
         super().pickle_data_dump()
         super().write_rpt_summary()
         super().write_meta_data()
-        self.dyn_df = pd.DataFrame()
+        # self.dyn_df = pd.DataFrame()
         self.xl_files = []
 
     def look_up_test_name(self, chan_key):
@@ -130,6 +119,7 @@ class LgNewareData(BaseNewareData):
             print('Channel not in list, return \'RPT\'')
             return 'RPT'
 
+
 class LgRptData(BaseRptData):
     def __init__(self, rpt_dict, ica_step_list):
         BaseRptData.__init__(self, rpt_dict, ica_step_list)
@@ -148,13 +138,12 @@ class LgRptData(BaseRptData):
             try:
                 ref_df = self.char_dict[key][self.char_dict[key].step_nbr == stp - 2]
                 step_df = self.char_dict[key][self.char_dict[key].step_nbr == stp]
-                if (step_df['step_mode'][0] == 'CC_DChg' or step_df['step_mode'][0] == 'CC DChg') and ref_df['step_mode'][0] == 'CCCV_Chg':
+                if ((step_df['step_mode'][0] == 'CC_DChg' or step_df['step_mode'][0] == 'CC DChg') and (ref_df['step_mode'][0] == 'CCCV_Chg' or ref_df['step_mode'][0] == 'CCCV Chg')):
                     if abs(step_df.curr[0] + 1.15) < 0.2 and step_df['maxV'][0] > 4 and step_df['minV'][0] < 3:
                         print(f'Cap at rpt {i:.0f} is {step_df.cap[0]:.2f} mAh')
-                        tmp_cap_df = pd.DataFrame(data=step_df.cap.values, columns=['cap'], index=[f'cap_meas_{i}'])
-                        cap_df = pd.concat([cap_df, tmp_cap_df])
-                        cap_df = cap_df.append(pd.DataFrame(data=step_df.cap.values, columns=['cap'],
-                                                            index=['cap_meas_{}'.format(i)]))
+                        cap_df.loc[f'cap_meas_{i}'] = step_df.cap.values
+                        # tmp_cap_df = pd.DataFrame(data=step_df.cap.values, columns=['cap'], index=[f'cap_meas_{i}'])
+                        # cap_df = pd.concat([cap_df, tmp_cap_df])
                         i += 1
             except:
                 pass
@@ -166,10 +155,11 @@ class LgRptData(BaseRptData):
 if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
     import os
+
     outer_tic = dt.datetime.now()
     BASE_PATH = get_base_path_batt_lab_data()
     stat_test = "stat_test/cycling_data"
     pulse_charge = "pulse_chrg_test/cycling_data_ici"
     test_case = LgNewareDataSet(os.path.join(BASE_PATH, pulse_charge))
     outer_toc = dt.datetime.now()
-    print('Total elapsed time was {:.2f} min.'.format((outer_toc - outer_tic).total_seconds() / 60))
+    print(f'Total elapsed time was {(outer_toc - outer_tic).total_seconds() / 60:.2f} min.')

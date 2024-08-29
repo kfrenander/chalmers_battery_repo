@@ -1,15 +1,12 @@
-import sys
-import pandas as pd
-from scipy.integrate import cumtrapz
 import datetime as dt
-import numpy as np
-import re
-from natsort.natsort import natsorted
 import os
+import re
+import time
 from collections import OrderedDict
+import numpy as np
+import pandas as pd
 # from test_data_analysis.read_neware_file import read_neware_xls
 from test_data_analysis.read_neware_files import NewareDataReader
-import time
 
 
 class BaseNewareDataSet(object):
@@ -46,9 +43,9 @@ class BaseNewareDataSet(object):
 class BaseNewareData(object):
 
     def __init__(self, list_of_files, n_cores=8):
-        import pickle
         self.file_names = list_of_files
         self.ica_step_list = []
+        self.ici_step_dict = {}
         self.pkl_dir = ''
         self.machine_id = ''
         self.channel_id = ''
@@ -86,9 +83,11 @@ class BaseNewareData(object):
                 res_file = f'{self.channel_name}_res_dump_{key}.pkl'
                 cap_file = f'{self.channel_name}_cap_dump_{key}.pkl'
                 rpt_file = f'{self.channel_name}_rpt_raw_dump_{key}.pkl'
+                ici_file = f'{self.channel_name}_ici_dump_{key}.pkl'
                 self.rpt_analysis.ica_dict[key].to_pickle(os.path.join(op_dir, ica_file))
                 self.rpt_analysis.res[key].to_pickle(os.path.join(op_dir, res_file))
                 self.rpt_analysis.cap[key].to_pickle(os.path.join(op_dir, cap_file))
+                self.ici_step_dict[key].to_pickle(os.path.join(op_dir, ici_file))
                 rpt_dict[key].to_pickle(os.path.join(op_dir, rpt_file))
         except:
             print('Unable to pickle ICA and/or res')
@@ -135,7 +134,7 @@ class BaseNewareData(object):
         pool.close()
         pool.join()
         self.fix_split_errors()
-        print('Time for characterisation was {} seconds.'.format((dt.datetime.now() - char_start).seconds))
+        print(f'Time for characterisation was {(dt.datetime.now() - char_start).seconds:.2f} seconds.')
         return None
 
     def fix_split_errors(self):
@@ -368,22 +367,35 @@ class BaseNewareData(object):
             rpt_dict = {k: v for k, v in rpt_dict.items() if not v.empty}
         else:
             start_idx = self.stat_df[(self.stat_df['step_duration_float'] == 28) &
-                                     (self.stat_df['mode'] == 'Rest')][['arb_step1', 'arb_step2']]
+                                     (self.stat_df['mode'] == 'Rest')][['cyc_step1', 'orig_step']]
             stop_idx = self.stat_df[(self.stat_df['step_duration_float'] == 34) &
-                                     (self.stat_df['mode'] == 'Rest')][['arb_step1', 'arb_step2']]
+                                     (self.stat_df['mode'] == 'Rest')][['cyc_step1', 'orig_step']]
             rpt_dict = {}
             for i in range(stop_idx.shape[0]):
                 key_val = f'rpt_{i + 1}'
-                intermediate = self.dyn_df[(self.dyn_df['arb_step2'] >= start_idx['arb_step2'].iloc[i]) &
-                                           (self.dyn_df['arb_step2'] <= stop_idx['arb_step2'].iloc[i])]
-                rpt_dict[key_val] = intermediate[(intermediate['arb_step1'] >= start_idx['arb_step1'].iloc[i]) &
-                                                 (intermediate['arb_step1'] <= stop_idx['arb_step1'].iloc[i])]
+                intermediate = self.dyn_df[(self.dyn_df['cyc_step1'] >= start_idx['cyc_step1'].iloc[i]) &
+                                           (self.dyn_df['cyc_step1'] <= stop_idx['cyc_step1'].iloc[i])]
+                rpt_dict[key_val] = intermediate[(intermediate['orig_step'] >= start_idx['orig_step'].iloc[i]) &
+                                                 (intermediate['orig_step'] <= stop_idx['orig_step'].iloc[i])]
             rpt_dict = {k: v for k, v in rpt_dict.items() if not v.empty}
 
         return rpt_dict
 
     def find_ica_steps(self):
-        self.ica_step_list = self.step_char[self.step_char.step_duration > 10 * 3600].step_nbr.tolist()
+        if self.raw_data_reader.ver_id == 'v76':
+            self.ica_step_list = self.step_char[self.step_char.step_duration > 10 * 3600].step_nbr.tolist()
+        else:
+            self.ica_step_list = self.stat_df[self.stat_df['step_duration_float'] > 10 * 3600].step_nbr.tolist()
+
+    def find_ici_steps(self):
+        ici_strt_df = self.stat_df[(self.stat_df['step_duration_float'] == 43) & (self.stat_df['mode'] == 'Rest')]['step_nbr']
+        ici_stop_df = self.stat_df[(self.stat_df['step_duration_float'] == 18) & (self.stat_df['mode'] == 'Rest')]['step_nbr']
+        if ici_strt_df.shape == ici_stop_df.shape:
+            ici_strt_df = ici_strt_df.reset_index(drop=True)
+            self.ici_step_dict = {f'rpt_{k + 1}': self.dyn_df[(self.dyn_df['arb_step2'] > ici_strt_df.iloc[k]) &
+                                                              (self.dyn_df['arb_step2'] < ici_stop_df.iloc[k])]
+                                  for k, itm in ici_strt_df.items()}
+        return None
 
     def write_rpt_summary(self):
         op_dir = os.path.join(os.path.split(self.file_names[0])[0], 'rpt_summaries')
@@ -404,16 +416,12 @@ class BaseRptData(object):
 
     def __init__(self, rpt_dict, ica_step_list):
         from test_data_analysis.rpt_analysis import find_step_characteristics, find_res
-        from test_data_analysis.capacity_test_analysis import find_cap_meas
         self.rpt_dict = rpt_dict
-        # self.sort_individual_rpt(rpt_df)
         self.char_dict = {key: find_step_characteristics(self.rpt_dict[key]) for key in self.rpt_dict}
         self.res = {key: find_res(self.rpt_dict[key], self.char_dict[key]) for key in self.rpt_dict}
         self.egy = {key: self.char_dict[key].filter(like='egy').iloc[0] for key in self.rpt_dict}
-        self.date = {key: '{:%Y-%m-%d}'.format(
-            self.rpt_dict[key].abs_time[self.rpt_dict[key].abs_time.first_valid_index()]) for key in self.rpt_dict}
-        self.ica_dict = {key: self.rpt_dict[key][self.rpt_dict[key].arb_step2.isin(ica_step_list)]
-                         for key in self.rpt_dict}
+        self.date = {key: f'{df["abs_time"].iloc[0]:%Y-%m-%d}' for key, df in self.rpt_dict.items()}
+        self.ica_dict = {key: df[df.arb_step2.isin(ica_step_list)] for key, df in self.rpt_dict.items()}
         self.ica_analysis()
 
     def sort_individual_rpt(self, df):
@@ -422,19 +430,24 @@ class BaseRptData(object):
 
     def ica_analysis(self):
         from test_data_analysis.ica_analysis import perform_ica
-        for key in self.ica_dict:
-            ica_df = self.ica_dict[key]
+        for key, ica_df in self.ica_dict.items():
+            processed_df = None
             try:
+                if ica_df.empty:
+                    print(f'No ICA data available for key: {key}')
+                    continue
                 gb = ica_df.groupby('step')
                 ica_dchg = [perform_ica(gb.get_group(x)) for x in gb.groups if gb.get_group(x).curr.mean() < 0][0]
                 ica_chrg = [perform_ica(gb.get_group(x)) for x in gb.groups if gb.get_group(x).curr.mean() > 0][0]
                 processed_df = pd.concat([ica_chrg, ica_dchg])
-            except IndexError:
-                print('Something failed when calculating gradient')
+            except IndexError as e:
+                print(f'IndexError for key {key}: {e}')
             except ValueError as e:
-                print('ICA for this RPT probably empty')
-                print(e)
-            self.ica_dict[key] = processed_df
+                print(f'ValueError for key {key}: {e}')
+            except Exception as e:
+                print(f'Unexpected error for key {key}: {e}')
+            if processed_df is not None:
+                self.ica_dict[key] = processed_df
         return self
 
     def create_cell_summary(self):

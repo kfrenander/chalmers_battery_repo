@@ -5,7 +5,6 @@ import os
 import re
 import pandas as pd
 import datetime as dt
-from natsort.natsort import natsorted
 import numpy as np
 from test_data_analysis.rpt_analysis import characterise_steps
 from multiprocessing import Pool
@@ -54,11 +53,6 @@ class TeslaNewareData(BaseNewareData):
     def __init__(self, list_of_files, n_cores=8):
         super().__init__(list_of_files, n_cores)
         self.test_name = self.look_up_test_name(self.channel_name)
-        # self.stat = pd.DataFrame()
-        # self.cyc = pd.DataFrame()
-        # self.xl_files = [pd.ExcelFile(file_name) for file_name in natsorted(self.file_names)]
-        # BaseNewareData.read_dynamic_data(self)
-        # super().read_cycle_statistics()
         debug_start = dt.datetime.now()
         df_split = np.array_split(self.dyn_df, n_cores)
         pool = Pool(n_cores)
@@ -70,7 +64,7 @@ class TeslaNewareData(BaseNewareData):
         self.rpt_analysis = TeslaRptData(self.find_rpt_dict(), self.ica_step_list)
         super().pickle_data_dump()
         super().write_rpt_summary()
-        self.dyn_df = pd.DataFrame()
+        # self.dyn_df = pd.DataFrame()
         self.xl_files = []
 
     def look_up_test_name(self, chan_key):
@@ -182,7 +176,7 @@ class TeslaRptData(BaseRptData):
                 ref_df = self.char_dict[key][self.char_dict[key].step_nbr == stp - 2]
                 step_df = self.char_dict[key][self.char_dict[key].step_nbr == stp]
                 if (step_df['step_mode'][0] == 'CC_DChg' or step_df['step_mode'][0] == 'CC DChg') \
-                        and ref_df['step_mode'][0] == 'CCCV_Chg':
+                        and (ref_df['step_mode'][0] == 'CCCV_Chg' or ref_df['step_mode'][0] == 'CCCV Chg' ):
                     if abs(step_df.curr[0] + 1.53) < 0.2 and step_df['maxV'][0] > 4 and step_df['minV'][0] < 3:
                         print('Cap is {:.2f} mAh'.format(step_df.cap[0]))
                         cap_df = pd.concat([cap_df, pd.DataFrame(data=step_df.cap.values,
@@ -197,7 +191,11 @@ class TeslaRptData(BaseRptData):
 
 
 if __name__ == '__main__':
+    import time
     aline_10_dod = r"\\sol.ita.chalmers.se\groups\batt_lab_data\ALINE_data\10_dod_data"
     aline_50_dod = r"\\sol.ita.chalmers.se\groups\batt_lab_data\ALINE_data\50_dod_data"
     aline_after_rest = r"\\sol.ita.chalmers.se\groups\batt_lab_data\ALINE_data\After_long_storage_RPT"
+    tic = time.time()
     test_case = TeslaNewareDataSet(aline_after_rest)
+    toc = time.time()
+    print(f'Entire characterisation lasted for {(toc - tic) / 60:.3f} minutes')
