@@ -52,8 +52,10 @@ def calculate_fce_from_rpt(rpt_str):
 
 
 if __name__ == '__main__':
+    from check_current_os import get_base_path_batt_lab_data
+    BASE_DATA_PATH = get_base_path_batt_lab_data()
     #data_loc = r"\\sol.ita.chalmers.se\groups\batt_lab_data\pulse_chrg_test\cycling_data"
-    data_loc = '/mnt/batt_lab_data/pulse_chrg_test/cycling_data'
+    data_loc = os.path.join(BASE_DATA_PATH, 'pulse_chrg_test/cycling_data')
     cycle_data = CycleAgeingDataIndexer()
     cycle_data.run(data_loc)
 
@@ -95,8 +97,10 @@ if __name__ == '__main__':
     ax.set_ylabel('Capacity retention [-]')
     fig.savefig(os.path.join(output_dir, 'error_bar_all_cells.png'), dpi=400)
 
-    ref_cases_dchg_pulsing = ['1000mHz', '1000mHz_no_pulse',
-                              '100mHz', '100mHz_no_pulse']
+    ref_cases_dchg_pulsing = ['1000mHz Pulse Charge',
+                              '1000mHz Pulse Charge no pulse discharge',
+                              '100mHz Pulse Charge',
+                              '100mHz Pulse Charge no pulse discharge']
     fig, ax = plt.subplots(1, 1)
     for t_name, cmb_dat in cycle_data.combined_data.items():
         if t_name in ref_cases_dchg_pulsing:
@@ -108,7 +112,7 @@ if __name__ == '__main__':
                         label=t_name,
                         markersize=mark_size,
                         capsize=cap_size)
-    plt.legend(ncols=2)
+    plt.legend(ncols=1)
     ax.set_xlabel('FCE [-]')
     ax.set_ylabel('Capacity retention [-]')
     ax.grid(alpha=0.4, color='grey')
@@ -125,7 +129,7 @@ if __name__ == '__main__':
                         label=t_name,
                         markersize=mark_size,
                         capsize=cap_size)
-    plt.legend(ncols=2)
+    plt.legend(ncols=1)
     ax.set_xlabel('FCE [-]')
     ax.set_ylabel('Capacity retention [-]')
     ax.grid(alpha=0.4, color='grey')
@@ -135,17 +139,17 @@ if __name__ == '__main__':
     plt.figure()
     for rpt, df in natsorted(cycle_data.ageing_data['240095_3_1'].ica_data.items()):
         plt.plot(df[df.curr > 0].cap, df[df.curr > 0].dva_gauss, label=f'FCE {calculate_fce_from_rpt(rpt)}')
-    plt.ylim((0, 5))
+    plt.ylim((0, 2))
     plt.legend()
     plt.xlabel(r'Charge capacity $\left[\SI{}{\milli\ampere\hour}\right]$')
-    plt.ylabel(r'Differential Voltage $\frac{dV}{dQ}$ '
+    plt.ylabel(r'Differential Voltage $\frac{\mathrm{d}V}{\mathrm{d}Q}$ '
                r'$\left[\unit[per-mode=fraction]{\volt\per\milli\ampere\per\hour}\right]$')
 
     plt.figure()
     for rpt, df in cycle_data.ageing_data['240095_3_1'].ica_data.items():
         plt.plot(df[df.curr > 0].volt, df[df.curr > 0].ica_gauss, label=f'FCE {calculate_fce_from_rpt(rpt)}')
     plt.xlabel(r'Voltage [$\SI{}{\volt}$]')
-    plt.ylabel(r'Incremental Capacity $\frac{dQ}{dV}$ [$\SI{}{\milli\ampere\hour\per\volt}$]')
+    plt.ylabel(r'Incremental Capacity $\frac{\mathrm{d}Q}{\mathrm{d}V}$ [$\SI{}{\milli\ampere\hour\per\volt}$]')
     plt.legend()
 
     plt.figure()
@@ -153,9 +157,9 @@ if __name__ == '__main__':
         df = age_data.ica_data['rpt_1']
         plt.plot(df[df.curr > 0].volt, df[df.curr > 0].ica_gauss, color=age_data.visual_profile.COLOR)
     plt.xlabel(r'Voltage [$\SI{}{\volt}$]')
-    plt.ylabel(r'Incremental Capacity $\frac{dQ}{dV}$ [$\SI{}{\milli\ampere\hour\per\volt}$]')
+    plt.ylabel(r'Incremental Capacity $\frac{\mathrm{d}Q}{\mathrm{d}V}$ [$\SI{}{\milli\ampere\hour\per\volt}$]')
 
-    cases_to_plot = ['CC reference', '1000mHz']
+    cases_to_plot = ['Reference test 2.5 A', '1000mHz Pulse Charge']
     plt.figure()
     for cell, age_data in cycle_data.ageing_data.items():
         if age_data.TEST_NAME in cases_to_plot:
@@ -164,7 +168,7 @@ if __name__ == '__main__':
                      color=age_data.visual_profile.COLOR,
                      label=age_data.TEST_NAME)
     plt.xlabel(r'Voltage $\left[\unit{\volt}\right]$')
-    plt.ylabel(r'Incremental Capacity $\frac{dQ}{dV}$ $[\unit{\milli\ampere\hour\per\volt}]$')
+    plt.ylabel(r'Incremental Capacity $\frac{\mathrm{d}Q}{\mathrm{d}V}$ $[\unit{\milli\ampere\hour\per\volt}]$')
     plt.text(3, 4.2, 'EoL ICA ',
              fontdict={'fontsize': 16, 'family': 'serif'},
              bbox={'facecolor': 'white', 'boxstyle': 'round'})
@@ -178,11 +182,11 @@ if __name__ == '__main__':
             plt.plot(df[df.curr > 0].cap, df[df.curr > 0].dva_gauss,
                      color=age_data.visual_profile.COLOR,
                      label=age_data.TEST_NAME)
-    plt.ylim((0, 3))
+    plt.ylim((0, 2))
     plt.xlabel(r'Charge capacity $\left[\unit{\milli\ampere\hour}\right]$')
-    plt.ylabel(r'Differential Voltage $\frac{dV}{dQ}$ '
+    plt.ylabel(r'Differential Voltage $\frac{\mathrm{d}V}{\mathrm{d}Q}$ '
                r'$\left[\unit[per-mode=fraction]{\volt\per\milli\ampere\per\hour}\right]$')
-    plt.text(2500, 2.0, 'EoL DVA ',
+    plt.text(2500, 1.0, 'EoL DVA ',
              fontdict={'fontsize': 16, 'family': 'serif'},
              bbox={'facecolor': 'white', 'boxstyle': 'round'})
     plt.legend(ncol=2)

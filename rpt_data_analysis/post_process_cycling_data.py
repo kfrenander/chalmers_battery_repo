@@ -3,18 +3,20 @@ import re
 import pandas as pd
 import numpy as np
 from scipy.integrate import trapz
+from rpt_data_analysis.test_name_registry import initiate_test_names
+from misc_classes.test_metadata_reader import MetadataReader
 
 
-def initiate_test_names():
+def initiate_test_names_pulse_charge():
     test_name_list = [
-        '1000mHz',
-        '1000mHz_no_pulse',
-        '500mHz',
-        '320mHz',
-        '100mHz',
-        '100mHz_no_pulse',
-        '10mHz',
-        'CC reference',
+        '1000mHz Pulse Charge',
+        '1000mHz Pulse Charge no pulse discharge',
+        '500mHz Pulse Charge',
+        '320mHz Pulse Charge',
+        '100mHz Pulse Charge',
+        '100mHz Pulse Charge no pulse discharge',
+        '10mHz Pulse Charge',
+        'Reference test 2.5 A',
     ]
     return test_name_list
 
@@ -61,57 +63,60 @@ class CycleAgeingDataIndexer:
                 self.directory_file_dict[chnl_id] = f_list
         return None
 
-    def initiate_channel_test_mapping(self):
-        chnl_list = [f'240095_{k}_{i}' for k in range(2, 4) for i in range(1, 9)]
-        test_name_list = [
-            '1000mHz',
-            '1000mHz',
-            '1000mHz_no_pulse',
-            '1000mHz_no_pulse',
-            '500mHz',
-            '500mHz',
-            '320mHz',
-            '320mHz',
-            '100mHz',
-            '100mHz',
-            '100mHz_no_pulse',
-            '100mHz_no_pulse',
-            '10mHz',
-            '10mHz',
-            'CC reference',
-            'CC reference'
-        ]
-        self.test_naming = dict(zip(chnl_list, test_name_list))
-        return None
+    # def initiate_channel_test_mapping(self):
+    #     chnl_list = [f'240095_{k}_{i}' for k in range(2, 4) for i in range(1, 9)]
+    #     test_name_list = [
+    #         '1000mHz',
+    #         '1000mHz',
+    #         '1000mHz_no_pulse',
+    #         '1000mHz_no_pulse',
+    #         '500mHz',
+    #         '500mHz',
+    #         '320mHz',
+    #         '320mHz',
+    #         '100mHz',
+    #         '100mHz',
+    #         '100mHz_no_pulse',
+    #         '100mHz_no_pulse',
+    #         '10mHz',
+    #         '10mHz',
+    #         'CC reference',
+    #         'CC reference'
+    #     ]
+    #     self.test_naming = dict(zip(chnl_list, test_name_list))
+    #     return None
 
     def fill_ageing_data(self):
         self.ageing_data = {}
         for idx, file_list in self.directory_file_dict.items():
             try:
-                self.ageing_data[idx] = CycleAgeingDataReader(idx, self.test_naming[idx], file_list)
+                self.ageing_data[idx] = CycleAgeingDataReader(idx, file_list)
             except Exception as e:
                 print('An error occurred:', e)
 
     def generate_replicate_combined_data(self):
-        test_names = initiate_test_names()
+        test_meta_data = MetadataReader()
+        TEST_NAMES = test_meta_data.excel_data.TEST_CONDITION.unique()
         self.combined_data = {}
-        for tn in test_names:
+        for tn in TEST_NAMES:
             tmp_list = []
             for ch_id, ag_data in self.ageing_data.items():
-                if ag_data.TEST_NAME == tn:
+                if ag_data.meta_data.test_condition == tn:
                     tmp_list.append(ag_data.rpt_data)
-            combined_df = pd.merge_asof(tmp_list[0], tmp_list[1],
-                                        left_on='fce',
-                                        right_on='fce',
-                                        suffixes=('_cell1', '_cell2'))
-            combined_df['avg_rel_cap'] = combined_df[['cap_relative_cell1', 'cap_relative_cell2']].mean(axis=1)
-            combined_df['std_rel_cap'] = combined_df[['cap_relative_cell1', 'cap_relative_cell2']].std(axis=1)
-            self.combined_data[tn] = combined_df
+            print(len(tmp_list), tn)
+            if tmp_list:
+                combined_df = pd.merge_asof(tmp_list[0], tmp_list[1],
+                                            left_on='fce',
+                                            right_on='fce',
+                                            suffixes=('_cell1', '_cell2'))
+                combined_df['avg_rel_cap'] = combined_df[['cap_relative_cell1', 'cap_relative_cell2']].mean(axis=1)
+                combined_df['std_rel_cap'] = combined_df[['cap_relative_cell1', 'cap_relative_cell2']].std(axis=1)
+                self.combined_data[tn] = combined_df
         return None
 
-    def run(self, top_directory):
+    def run(self, top_directory, project_key='pulse_charging'):
         self.top_dir = top_directory
-        self.initiate_channel_test_mapping()
+        self.test_naming = initiate_test_names(proj_key=project_key)
         self.index_data()
         self.fill_ageing_data()
         self.generate_replicate_combined_data()
@@ -119,17 +124,20 @@ class CycleAgeingDataIndexer:
 
 class CycleAgeingDataReader:
 
-    def __init__(self, chnl_id=None, test_name=None, list_of_files=None):
+    def __init__(self, chnl_id=None, list_of_files=None):
         self.chnl_id = chnl_id
-        self.TEST_NAME = test_name
+        self.TEST_NAME = None
         self.pkl_files = list_of_files
         self.rpt_data = None
         self.ica_data = None
         self.dyn_data = None
+        self.meta_data = None
         self.average_temperature = None
         self.read_rpt_summary()
         self.read_ica_data()
-        self.visual_profile = VisualProfileUniqueTest(test_name=test_name)
+        self.read_metadata()
+        self.TEST_NAME = self.meta_data.test_condition
+        self.visual_profile = VisualProfileUniqueTest(test_name=self.TEST_NAME)
 
     def read_rpt_summary(self):
         found_summary = False
@@ -156,6 +164,15 @@ class CycleAgeingDataReader:
                     print(f"An error occurred while reading file '{pkl_file}': {e}")
         if not found_summary:
             print(f'No rpt summary file found for data from channel {self.chnl_id}.\nPlease check data.')
+
+    def read_metadata(self):
+        for file in self.pkl_files:
+            if 'metadata' in file:
+                try:
+                    self.meta_data = MetadataReader(file)
+                except Exception as e:
+                    print(f'Error occured when reading metadata from {file}: {e}')
+
 
     def read_ica_data(self):
         self.ica_data = {}
@@ -208,7 +225,7 @@ class CycleAgeingDataReader:
 class VisualProfileAllAgeingTests:
 
     def __init__(self):
-        self.TEST_NAMES = initiate_test_names()
+        self.TEST_NAMES = initiate_test_names_pulse_charge()
         self.COLORS = self.initiate_color_dictionary()
         self.LINE_STYLES = self.initiate_line_styles()
         self.MARKERS = self.initiate_markers()

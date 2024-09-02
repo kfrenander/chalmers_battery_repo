@@ -1,9 +1,20 @@
 import pandas as pd
 import numpy as np
+import os
+import re
+from misc_classes.test_metadata_reader import MetadataReader
 import matplotlib.pyplot as plt
-from test_data_analysis.read_neware_file import read_neware_xls
-from scipy import signal
-plt.style.use('seaborn-bright')
+from test_data_analysis.read_neware_files import NewareDataReader
+from check_current_os import get_base_path_batt_lab_data
+from test_data_analysis.rpt_analysis import characterise_steps
+import natsort
+plt.style.use('kelly_colors')
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "Helvetica",
+    "text.latex.preamble": r'\usepackage{siunitx}'
+})
+
 
 
 def check_ici_step(df, step):
@@ -34,41 +45,240 @@ def calc_step_res(df):
     return df
 
 
+def find_ici_parameters(df, ch_df):
+    df['stp_diff'] = df['arb_step2'].diff().fillna(0)
+    for k, row in ch_df.iterrows():
+        if row['current_mode'] == 'interrupt':
+            stp = row['step_nbr']
+            idf = df[df['arb_step2'] == stp]
+            curr = df[df['arb_step2'] == stp - 1]['curr'].mean()
+            pol_volt = df[df['arb_step2'] == stp - 1]['volt'].iloc[-1]
+            beg_volt = idf['volt'].iloc[0]
+            fin_volt = idf['volt'].iloc[-1]
+            R0 = (pol_volt - beg_volt) / curr
+            R10 = (pol_volt - fin_volt) / curr
+            ch_df.loc[k, 'R0_mohm'] = R0 * 1e3
+            ch_df.loc[k, 'R10_mohm'] = R10 * 1e3
+            slope, v_intcpt = fit_lin_vs_sqrt_time(idf, 'volt')
+            ch_df.loc[k, 'k'] = - slope / curr
+            ch_df.loc[k, 'R_reg_mohm'] = 1e3 * (pol_volt - v_intcpt) / curr
+        else:
+            stp = row['step_nbr']
+            cdf = df[df['arb_step2'] == stp]
+            fit_coeffs, residual = fit_lin_ocp_slope(cdf, 'volt')
+            if residual[0] < 1e-5:
+                ch_df.loc[k, 'dOCPdT'] = fit_coeffs[0]
+    return ch_df
+
+
+def categorize_step(ch_df):
+    for k, row in ch_df.iterrows():
+        if row['step_mode'] == 'Rest':
+            if ch_df.loc[k - 1, 'step_mode'] == 'CC Chg':
+                ch_df.loc[k, 'ici_mode'] = 'chrg'
+            elif ch_df.loc[k - 1, 'step_mode'] == 'CC DChg':
+                ch_df.loc[k, 'ici_mode'] = 'dchg'
+            ch_df.loc[k, 'current_mode'] = 'interrupt'
+        else:
+            ch_df.loc[k, 'current_mode'] = 'current'
+    return ch_df
+
+
+def fit_lin_vs_sqrt_time(df, col):
+    fit_df = df[(df['float_step_time'] > 1)] # & (df['step_time_float'] <= 5)]
+    coeffs = np.polyfit(np.sqrt(fit_df['float_step_time']), fit_df[col], 1)
+    return coeffs
+
+
+def fit_lin_ocp_slope(df, col):
+    fit_df = df[df['float_step_time'] > df['float_step_time'].max() - 120]
+    fit_tuple = np.polyfit(fit_df['float_step_time'], fit_df[col], 1, full=True)
+    coeffs = fit_tuple[0]
+    residual = fit_tuple[1]
+    return coeffs, residual
+
+
+def perform_ici_analysis(pkl_file):
+    ici_df = pd.read_pickle(pkl_file)
+    proc_df = characterise_steps(ici_df)
+    proc_df = categorize_step(proc_df)
+    proc_df = find_ici_parameters(ici_df, proc_df)
+    return proc_df
+
+
+def run_ici_analysis_on_path(base_path):
+    for root, _, files in os.walk(base_path):
+        for file in files:
+            if file.endswith('.pkl') and 'ici_dump' in file:
+                print(f'Processing {file} from {os.path.split(root)[-1]}')
+                tmp_df = perform_ici_analysis(os.path.join(root, file))
+                output_file = os.path.join(root, file.replace('dump', 'processed'))
+                tmp_df.to_pickle(output_file)
+    return None
+
+
+def compare_cases(base_folder, subfolder_filters, rpt_filters, plot_var='k', plot_mode='all'):
+    """
+    Compares specific test cases from selected subfolders and files based on identifiers and rpt numbers.
+
+    Parameters:
+        base_folder (str): The path to the base folder containing subfolders with data files.
+        subfolder_filters (list of tuples): List of (y, z) tuples to filter subfolders.
+        rpt_filters (list of int): List of rpt numbers to include.
+        plot_var (str): The name of the variable to plot
+
+    Returns:
+        Figure, Axes: The figure and axes used for plotting.
+    """
+    # Compile regex patterns for filtering subfolders and rpt files
+    subfolder_patterns = [f"pickle.*channel_.*_{y}_{z}" for y, z in subfolder_filters]
+    rpt_patterns = [f"2.*ici_processed_rpt_{rpt}.pkl" for rpt in rpt_filters]
+
+    # Initialize a new plot for comparison
+    fig, ax = plt.subplots()
+
+    # Traverse through all directories and subdirectories
+    for root, dirs, files in os.walk(base_folder):
+        for d in dirs:
+            # Check if the current directory matches any of the subfolder patterns
+            if any(re.search(pattern, os.path.basename(d)) for pattern in subfolder_patterns):
+                subfolder_dir = os.path.join(root, d)
+                # print(subfolder_dir)
+                for file in os.listdir(subfolder_dir):
+                    # Check if file is metadata file - must run first
+                    if re.search('metadata.*', file):
+                        meta_data = MetadataReader(os.path.join(root, d, file))
+                for file in natsort.natsorted(os.listdir(subfolder_dir)):
+                    # Check if the file matches any of the rpt patterns
+                    if any(re.search(pattern, file) for pattern in rpt_patterns):
+                        file_path = os.path.join(root, d, file)
+                        print(f"Processing file: {file_path}")
+                        rpt_id = re.search(r'rpt_\d+', file).group().replace('_', ' ')
+                        ici_id = f'{meta_data.test_condition} {rpt_id}'
+
+                        # Load the data from the .pkl file
+                        ch_df = pd.read_pickle(file_path)
+
+                        # Apply the analysis function to the data
+                        fig, ax = plot_resistance(ch_df, fig=fig, ax=ax, resistance=plot_var,
+                                                  ici_id=ici_id, plot_mode=plot_mode)
+    return fig, ax
+
+
+def plot_resistance(ch_df, resistance='R0', fig=None, ax=None, ici_id='', plot_mode='all'):
+    """
+        Plots resistance values (R0 or R10) for charge and discharge data.
+
+        Parameters:
+            ch_df (DataFrame): The data to plot.
+            resistance (str): The resistance type to plot ('R0' or 'R10').
+            fig (Figure, optional): An existing figure to plot on.
+            ax (Axes, optional): An existing axes to plot on.
+            color_cycle (iterator, optional): An iterator for cycling through colors.
+
+        Returns:
+            Figure, Axes: The figure and axes used for plotting.
+        """
+    if resistance not in ['R0', 'R10', 'R_reg', 'k']:
+        raise ValueError("Invalid resistance type. Choose 'R0' or 'R10'.")
+
+    # Create new figure/axis if not provided
+    if fig is None and ax is None:
+        fig, ax = plt.subplots(1, 1)
+
+    color_cycle = ax._get_lines.prop_cycler
+
+    # Get next colors for each mode
+    color_chrg = next(color_cycle)['color']
+    color_dchg = next(color_cycle)['color']
+    if 'R' in resistance:
+        # Determine column name based on resistance type
+        col_name = f"{resistance}_mohm"
+    else:
+        col_name = resistance
+
+    # Plot the data
+    if plot_mode == 'all':
+        ch_df[ch_df['ici_mode'] == 'chrg'].plot.scatter(x='maxV', y=col_name, color=color_chrg, ax=ax, marker='.',
+                                                        label=f'{resistance} Chrg ICI {ici_id}')
+        ch_df[ch_df['ici_mode'] == 'dchg'].plot.scatter(x='maxV', y=col_name, color=color_dchg, ax=ax, marker='x',
+                                                        label=f'{resistance} Dchg ICI {ici_id}')
+    else:
+        try:
+            ch_df[ch_df['ici_mode'] == plot_mode].plot.scatter(x='maxV', y=col_name, color=color_chrg, ax=ax,
+                                                               marker='x', label=f'{resistance} Chrg ICI {ici_id}')
+        except Exception as e:
+            print(f'Plot mode unknown, must be \'chrg\' or \'dchg\'. Exception {e}.')
+
+    # Add legend and labels
+    ax.legend()
+    # ax.set_title(f'{resistance} vs maxV')
+    ax.set_xlabel('Voltage [V]')
+    ax.set_ylabel(fr'${{{resistance}}}$ [$\unit{{\milli\ohm}}$]')
+    return fig, ax
+
+
 my_file = r"Z:\Provning\Neware\ICI_test_127.0.0.1_240119-2-8-100.xls"
-df = read_neware_xls(my_file)
+reader = NewareDataReader(my_file)
+df = reader.read_dynamic_data()
+BASE_PATH = get_base_path_batt_lab_data()
+DATA_BASE_PATH = os.path.join(BASE_PATH, 'pulse_chrg_test/cycling_data_ici')
 
-df = calc_step_res(df)
+run_ici_analysis_on_path(DATA_BASE_PATH)
+subfolder_filters = [('2', '5'), ('3', '8')]  # Example tuples to filter subfolders by y and z
+rpt_filters = [1, 6, 11]  # Example rpt numbers to include
+k_fig, kax = compare_cases(DATA_BASE_PATH, subfolder_filters, rpt_filters, plot_var='k', plot_mode='chrg')
+r_fig, rax = compare_cases(DATA_BASE_PATH, subfolder_filters, rpt_filters, plot_var='R_reg', plot_mode='chrg')
+PKL_FILE_1 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_1.pkl"
+PKL_FILE_2 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_2.pkl"
+PKL_FILE_3 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_3.pkl"
+PKL_FILE_8 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_8.pkl"
 
-fig, ax1 = plt.subplots(1, 1)
-ax1.plot(df.float_time, df.volt, label='voltage')
-ax2 = ax1.twinx()
-ax2.grid(False)
-# ax2.set_ylim([0, 2e-3])
-ax2.scatter(df.float_time, df.R0, marker='x', color='r', label='R0')
-ax2.scatter(df.float_time, df.R10, marker='p', color='k', label='R10')
+rreg_fig, axr = plt.subplots(1, 1)
+r10_fig, ax10 = plt.subplots(1, 1)
+k_fig, kax = plt.subplots(1, 1)
+for pkl_file in [PKL_FILE_1, PKL_FILE_2, PKL_FILE_8]:
+    pkl_ici = os.path.join(BASE_PATH, pkl_file)
+    ici_id = re.search(r'rpt_\d', pkl_file).group()
+    df_pkl = pd.read_pickle(pkl_ici)
+    ch_df = characterise_steps(df_pkl)
+    ch_df = categorize_step(ch_df)
+    ch_df = find_ici_parameters(df_pkl, ch_df)
+    rreg_fig, axr = plot_resistance(ch_df, resistance='R_reg', ax=axr, ici_id=ici_id, plot_mode='dchg')
+    r10_fig, ax10 = plot_resistance(ch_df, resistance='R10', ax=ax10, ici_id=ici_id, plot_mode='dchg')
+    k_fig, kax = plot_resistance(ch_df, resistance='k', ax=kax, ici_id=ici_id, plot_mode='dchg')
+# df = calc_step_res(df)
 
-fig2, ax3 = plt.subplots(1, 1)
-xaxis = (df.mAh - df.mAh.min()) / (df.mAh.max() - df.mAh.min())
-ax3.plot(xaxis, df.volt, label='voltage')
-ax4 = ax3.twinx()
-ax4.grid(False)
-# ax2.set_ylim([0, 2e-3])
-ax4.scatter(xaxis, df.R0, marker='x', color='r', label='R0')
-ax4.scatter(xaxis, df.R10, marker='p', color='k', label='R10')
-ax4.legend()
-
-
-test_df = df[df.curr < 0]
-rem_df = test_df[test_df.volt.diff().abs() < 1e-3]
-test_ica = np.gradient(test_df.mAh/1000, test_df.volt)
-fig3, ax = plt.subplots(2, 1)
-ax[0].plot(rem_df.mAh/1000, rem_df.volt)
-ax[0].plot(test_df.mAh/1000, test_df.volt)
-# ax[0].plot(test_df.volt, test_ica)
-b, a = signal.butter(3, 0.01)
-volt_filt_butt = signal.filtfilt(b, a, rem_df.volt)
-ax[0].plot(rem_df.mAh/1000, volt_filt_butt)
-# ax[1].plot(df.float_time, volt_filt_savgol)
-filt_ica_butt = np.gradient(rem_df.mAh/1000, volt_filt_butt)
-ax[1].plot(rem_df.volt, filt_ica_butt)
-ax[1].set_ylim([0, 15])
+# fig, ax1 = plt.subplots(1, 1)
+# ax1.plot(df.float_time, df.volt, label='voltage')
+# ax2 = ax1.twinx()
+# ax2.grid(False)
+# # ax2.set_ylim([0, 2e-3])
+# ax2.scatter(df.float_time, df.R0, marker='x', color='r', label='R0')
+# ax2.scatter(df.float_time, df.R10, marker='p', color='k', label='R10')
+#
+# fig2, ax3 = plt.subplots(1, 1)
+# xaxis = (df.mAh - df.mAh.min()) / (df.mAh.max() - df.mAh.min())
+# ax3.plot(xaxis, df.volt, label='voltage')
+# ax4 = ax3.twinx()
+# ax4.grid(False)
+# # ax2.set_ylim([0, 2e-3])
+# ax4.scatter(xaxis, df.R0, marker='x', color='r', label='R0')
+# ax4.scatter(xaxis, df.R10, marker='p', color='k', label='R10')
+# ax4.legend()
+#
+#
+# test_df = df[df.curr < 0]
+# rem_df = test_df[test_df.volt.diff().abs() < 1e-3]
+# test_ica = np.gradient(test_df.mAh/1000, test_df.volt)
+# fig3, ax = plt.subplots(2, 1, sharex=True)
+# ax[0].plot(rem_df.mAh/1000, rem_df.volt)
+# ax[0].plot(test_df.mAh/1000, test_df.volt)
+# # ax[0].plot(test_df.volt, test_ica)
+# b, a = signal.butter(3, 0.01)
+# volt_filt_butt = signal.filtfilt(b, a, rem_df.volt)
+# ax[0].plot(rem_df.mAh/1000, volt_filt_butt)
+# # ax[1].plot(df.float_time, volt_filt_savgol)
+# filt_ica_butt = np.gradient(rem_df.mAh/1000, volt_filt_butt)
+# ax[1].plot(rem_df.volt, filt_ica_butt)
+# ax[1].set_ylim([0, 15])
