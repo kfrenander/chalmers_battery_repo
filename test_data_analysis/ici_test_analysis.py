@@ -117,7 +117,79 @@ def run_ici_analysis_on_path(base_path):
     return None
 
 
-def compare_cases(base_folder, subfolder_filters, rpt_filters, plot_var='k', plot_mode='all'):
+def sample_tests(base_folder, subfolder_filters, rpt_filters):
+    """
+    Samples test files from the base folder based on specified subfolder and rpt filters.
+
+    Parameters:
+        base_folder (str): The path to the base folder containing subfolders with data files.
+        subfolder_filters (list of tuples): List of (y, z) tuples to filter subfolders.
+        rpt_filters (list of int): List of rpt numbers to include.
+
+    Returns:
+        list of tuples: Each tuple contains (ici_id, ch_df) for each filtered test case.
+    """
+    # Compile regex patterns for filtering subfolders and rpt files
+    subfolder_patterns = [f"pickle.*channel_.*_{y}_{z}_" for y, z in subfolder_filters]
+    rpt_patterns = [f"2.*ici_processed_rpt_{rpt}.pkl" for rpt in rpt_filters]
+
+    sampled_tests = []
+
+    # Traverse through all directories and subdirectories
+    for root, dirs, files in os.walk(base_folder):
+        for d in dirs:
+            # Check if the current directory matches any of the subfolder patterns
+            if any(re.search(pattern, os.path.basename(d)) for pattern in subfolder_patterns):
+                subfolder_dir = os.path.join(root, d)
+
+                # Load metadata file
+                meta_data = None
+                for file in os.listdir(subfolder_dir):
+                    if re.search('metadata.*', file):
+                        meta_data = MetadataReader(file_path=os.path.join(root, d, file))
+
+                if not meta_data:
+                    continue  # Skip if metadata is not found
+
+                # Filter and process rpt files
+                for file in natsort.natsorted(os.listdir(subfolder_dir)):
+                    if any(re.search(pattern, file) for pattern in rpt_patterns):
+                        file_path = os.path.join(root, d, file)
+                        # print(f"Processing file: {file_path}")
+                        rpt_id = re.search(r'rpt_\d+', file).group().replace('_', ' ')
+                        ici_id = f'{meta_data.test_condition} {rpt_id}'
+
+                        # Load the data from the .pkl file
+                        ch_df = pd.read_pickle(file_path)
+                        sampled_tests.append((ici_id, ch_df))
+
+    return sampled_tests
+
+
+def plot_comparison(sampled_tests, plot_var='k', plot_mode='all', ax=None, fig=None):
+    """
+    Plots the comparison of the sampled test cases.
+
+    Parameters:
+        sampled_tests (list of tuples): List of (ici_id, ch_df) tuples for each test case.
+        plot_var (str): The name of the variable to plot.
+        plot_mode (str): The plotting mode.
+
+    Returns:
+        Figure, Axes: The figure and axes used for plotting.
+    """
+    # Initialize a new plot for comparison
+    if fig is None and ax is None:
+        fig, ax = plt.subplots(1, 1)
+
+    # Loop through the sampled tests and plot each one
+    for ici_id, ch_df in sampled_tests:
+        fig, ax = plot_resistance(ch_df, ax=ax, resistance=plot_var, ici_id=ici_id, plot_mode=plot_mode)
+
+    return fig, ax
+
+
+def compare_cases(base_folder, subfolder_filters, rpt_filters, plot_var='k', plot_mode='all', ax=None, fig=None):
     """
     Compares specific test cases from selected subfolders and files based on identifiers and rpt numbers.
 
@@ -126,42 +198,20 @@ def compare_cases(base_folder, subfolder_filters, rpt_filters, plot_var='k', plo
         subfolder_filters (list of tuples): List of (y, z) tuples to filter subfolders.
         rpt_filters (list of int): List of rpt numbers to include.
         plot_var (str): The name of the variable to plot
+        plot_mode (str): The plotting mode.
 
     Returns:
         Figure, Axes: The figure and axes used for plotting.
     """
-    # Compile regex patterns for filtering subfolders and rpt files
-    subfolder_patterns = [f"pickle.*channel_.*_{y}_{z}" for y, z in subfolder_filters]
-    rpt_patterns = [f"2.*ici_processed_rpt_{rpt}.pkl" for rpt in rpt_filters]
+    # Sample tests based on filters
+    sampled_tests = sample_tests(base_folder, subfolder_filters, rpt_filters)
 
-    # Initialize a new plot for comparison
-    fig, ax = plt.subplots()
+    # Plot the comparison
+    if ax:
+        fig, ax = plot_comparison(sampled_tests, plot_var=plot_var, plot_mode=plot_mode, ax=ax)
+    else:
+        fig, ax = plot_comparison(sampled_tests, plot_var=plot_var, plot_mode=plot_mode)
 
-    # Traverse through all directories and subdirectories
-    for root, dirs, files in os.walk(base_folder):
-        for d in dirs:
-            # Check if the current directory matches any of the subfolder patterns
-            if any(re.search(pattern, os.path.basename(d)) for pattern in subfolder_patterns):
-                subfolder_dir = os.path.join(root, d)
-                # print(subfolder_dir)
-                for file in os.listdir(subfolder_dir):
-                    # Check if file is metadata file - must run first
-                    if re.search('metadata.*', file):
-                        meta_data = MetadataReader(os.path.join(root, d, file))
-                for file in natsort.natsorted(os.listdir(subfolder_dir)):
-                    # Check if the file matches any of the rpt patterns
-                    if any(re.search(pattern, file) for pattern in rpt_patterns):
-                        file_path = os.path.join(root, d, file)
-                        print(f"Processing file: {file_path}")
-                        rpt_id = re.search(r'rpt_\d+', file).group().replace('_', ' ')
-                        ici_id = f'{meta_data.test_condition} {rpt_id}'
-
-                        # Load the data from the .pkl file
-                        ch_df = pd.read_pickle(file_path)
-
-                        # Apply the analysis function to the data
-                        fig, ax = plot_resistance(ch_df, fig=fig, ax=ax, resistance=plot_var,
-                                                  ici_id=ici_id, plot_mode=plot_mode)
     return fig, ax
 
 
@@ -218,35 +268,76 @@ def plot_resistance(ch_df, resistance='R0', fig=None, ax=None, ici_id='', plot_m
     return fig, ax
 
 
-my_file = r"Z:\Provning\Neware\ICI_test_127.0.0.1_240119-2-8-100.xls"
-reader = NewareDataReader(my_file)
-df = reader.read_dynamic_data()
-BASE_PATH = get_base_path_batt_lab_data()
-DATA_BASE_PATH = os.path.join(BASE_PATH, 'pulse_chrg_test/cycling_data_ici')
+def extract_averages(subfolder_filter_list, avg_param='k'):
+    full_dict = {}
+    for sub_filter in subfolder_filter_list:
+        smpl_wc = sample_tests(DATA_BASE_PATH, subfolder_filters=sub_filter, rpt_filters=['.*'])
+        mean_dct = {}
+        for smpl in smpl_wc:
+            nm, df = smpl
+            nm_rpt = re.search(r'rpt \d+', nm).group()
+            nm_cs = nm.split(' rpt')[0]
+            mean_dct[nm_rpt] = df[(df.maxV > 3.4) & (df.maxV < 4.1)][avg_param].mean()
+        dfm = pd.DataFrame.from_dict(mean_dct, orient='index', columns=[nm_cs])
+        full_dict[nm_cs] = dfm
+    return full_dict
 
-run_ici_analysis_on_path(DATA_BASE_PATH)
-subfolder_filters = [('2', '5'), ('3', '8')]  # Example tuples to filter subfolders by y and z
-rpt_filters = [1, 6, 11]  # Example rpt numbers to include
+# my_file = r"Z:\Provning\Neware\ICI_test_127.0.0.1_240119-2-8-100.xls"
+# reader = NewareDataReader(my_file)
+# df = reader.read_dynamic_data()
+BASE_PATH = get_base_path_batt_lab_data()
+DATA_BASE_PATH = os.path.join(BASE_PATH, 'pulse_chrg_test/cycling_data_repaired')
+
+# run_ici_analysis_on_path(DATA_BASE_PATH)
+subfolder_filters = [('2', '1'), ('2', '3'), ('3', '8')]  # Example tuples to filter subfolders by y and z
+rpt_filters = [1, 10]  # Example rpt numbers to include
+smpl = sample_tests(DATA_BASE_PATH, subfolder_filters, rpt_filters)
 k_fig, kax = compare_cases(DATA_BASE_PATH, subfolder_filters, rpt_filters, plot_var='k', plot_mode='chrg')
 r_fig, rax = compare_cases(DATA_BASE_PATH, subfolder_filters, rpt_filters, plot_var='R_reg', plot_mode='chrg')
-PKL_FILE_1 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_1.pkl"
-PKL_FILE_2 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_2.pkl"
-PKL_FILE_3 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_3.pkl"
-PKL_FILE_8 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_8.pkl"
+fig, ax = compare_cases(DATA_BASE_PATH, [(3, 7)], [1], plot_mode='dchg')
+compare_cases(DATA_BASE_PATH, [(2, 3), (2,7 ), (3, 1), (3, 7)], [10], plot_mode='dchg', ax=ax)
 
-rreg_fig, axr = plt.subplots(1, 1)
-r10_fig, ax10 = plt.subplots(1, 1)
-k_fig, kax = plt.subplots(1, 1)
-for pkl_file in [PKL_FILE_1, PKL_FILE_2, PKL_FILE_8]:
-    pkl_ici = os.path.join(BASE_PATH, pkl_file)
-    ici_id = re.search(r'rpt_\d', pkl_file).group()
-    df_pkl = pd.read_pickle(pkl_ici)
-    ch_df = characterise_steps(df_pkl)
-    ch_df = categorize_step(ch_df)
-    ch_df = find_ici_parameters(df_pkl, ch_df)
-    rreg_fig, axr = plot_resistance(ch_df, resistance='R_reg', ax=axr, ici_id=ici_id, plot_mode='dchg')
-    r10_fig, ax10 = plot_resistance(ch_df, resistance='R10', ax=ax10, ici_id=ici_id, plot_mode='dchg')
-    k_fig, kax = plot_resistance(ch_df, resistance='k', ax=kax, ici_id=ici_id, plot_mode='dchg')
+# subfolder_filter_list = [[(2, 3)], [(2, 7)], [(3, 1)], [(3, 8)]]
+subfolder_filter_log10 = [[(2, 3)], [(2, 7)], [(3, 1)], [(3, 8)]]
+subfolder_filter_nopulse = [[(2, 1)], [(2, 3)], [(2, 5)], [(2, 7)]]
+log10_dict_k = extract_averages(subfolder_filter_log10, avg_param='k')
+nopulse_dict_k = extract_averages(subfolder_filter_nopulse, avg_param='k')
+log10_dict_rreg = extract_averages(subfolder_filter_log10, avg_param='R_reg_mohm')
+
+fig, ax = plt.subplots(1, 1)
+for k, mean_df in log10_dict_k.items():
+    mean_df.plot(ax=ax)
+ax.set_ylabel(r'k [$\unit{{\milli\ohm\per\sqrt{\second}}}$]', fontsize=12)
+
+fig, ax = plt.subplots(1, 1)
+for k, mean_df in nopulse_dict_k.items():
+    mean_df.plot(ax=ax)
+ax.set_ylabel(r'k [$\unit{{\milli\ohm\per\sqrt{\second}}}$]', fontsize=12)
+
+fig, ax = plt.subplots(1, 1)
+for k, mean_df in log10_dict_rreg.items():
+    mean_df.plot(ax=ax)
+ax.set_ylabel(r'R\textsubscript{{reg}} [$\unit{{\milli\ohm}}$]', fontsize=12)
+
+
+# PKL_FILE_1 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_1.pkl"
+# PKL_FILE_2 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_2.pkl"
+# PKL_FILE_3 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_3.pkl"
+# PKL_FILE_8 = r"pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_3_8\240095_3_8_ici_dump_rpt_8.pkl"
+#
+# rreg_fig, axr = plt.subplots(1, 1)
+# r10_fig, ax10 = plt.subplots(1, 1)
+# k_fig, kax = plt.subplots(1, 1)
+# for pkl_file in [PKL_FILE_1, PKL_FILE_2, PKL_FILE_8]:
+#     pkl_ici = os.path.join(BASE_PATH, pkl_file)
+#     ici_id = re.search(r'rpt_\d', pkl_file).group()
+#     df_pkl = pd.read_pickle(pkl_ici)
+#     ch_df = characterise_steps(df_pkl)
+#     ch_df = categorize_step(ch_df)
+#     ch_df = find_ici_parameters(df_pkl, ch_df)
+#     rreg_fig, axr = plot_resistance(ch_df, resistance='R_reg', ax=axr, ici_id=ici_id, plot_mode='dchg')
+#     r10_fig, ax10 = plot_resistance(ch_df, resistance='R10', ax=ax10, ici_id=ici_id, plot_mode='dchg')
+#     k_fig, kax = plot_resistance(ch_df, resistance='k', ax=kax, ici_id=ici_id, plot_mode='dchg')
 # df = calc_step_res(df)
 
 # fig, ax1 = plt.subplots(1, 1)
