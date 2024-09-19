@@ -19,12 +19,14 @@ def _clean_xticks(ax):
 def _clean_labels(tck_lbls):
     return [re.sub("[^0-9]", "", itm.get_text()) for itm in tck_lbls]
 
+
 if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
     from run_files.stat_test_trial import sort_dict
-    save_fig = 0
-    BASE_OUTPUT_DIR = r"Z:\StatisticalTest\figures_new_test_names"
+    save_fig = 1
     BASE_BATTLAB_DIR = get_base_path_batt_lab_data()
+    BASE_OUTPUT_DIR = r"Z:\StatisticalTest\figures_from_synthetic_data"
+    SYNTHETIC_DATA_OUTPUT_DIR = os.path.join(BASE_BATTLAB_DIR, "stat_test/synthetic_data/chng_noise_data")
     dct_of_pkl = {
             "C": r"stat_test\processed_data\Test2_1.pkl",
             "A": r"stat_test\processed_data\Test1_1.pkl",
@@ -34,7 +36,10 @@ if __name__ == '__main__':
     dct_of_pkl = {k: os.path.join(BASE_BATTLAB_DIR, path) for k, path in dct_of_pkl.items()}
     df_dict = {k: pd.read_pickle(f_) for k, f_ in dct_of_pkl.items()}
     df_dict = sort_dict(df_dict)
+
     ppe_dict = {k: pp_itm(df) for k, df in df_dict.items()}
+    ppe_dict_red = {k: pp_itm(df) for k, df in red_noise_dct.items()}
+    ppe_dict_inc = {k: pp_itm(df) for k, df in inc_noise_dct.items()}
     x_width = 4.5
     fig_mu, axs = plt.subplots(2, 2, figsize=(2*x_width, 2*0.75*x_width), sharey='all')
     [ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e')) for ax in np.ravel(axs)]
@@ -94,8 +99,13 @@ if __name__ == '__main__':
 
 
     lbl_fmt = 'fce_num'
+    case_name = 'hi_inc_noise'
+    case_dict = {
+        'hi_red_noise': ppe_dict_red,
+        'hi_inc_noise': ppe_dict_inc
+    }
     # PLOT RSE FOR EACH TEST
-    for M, pp_it in ppe_dict.items():
+    for M, pp_it in case_dict[case_name].items():
         df = pp_it.rse
         if any('RPT' in c for c in df.columns):
             df.drop('RPT', axis=1, inplace=True)
@@ -117,24 +127,25 @@ if __name__ == '__main__':
         ax.set_ylim((0, 75))
         fig.subplots_adjust(bottom=0.14)
         if save_fig:
-            fig.savefig(os.path.join(BASE_OUTPUT_DIR, f'Test {M}', f'rse_plot_test_{M}_{lbl_fmt}.pdf'))
-            fig.savefig(os.path.join(BASE_OUTPUT_DIR, f'Test {M}', f'rse_plot_test_{M}_{lbl_fmt}.png'), dpi=400)
+            fig.savefig(os.path.join(BASE_OUTPUT_DIR, f'Test_{M}', f'rse_plot_{case_name}_test_{M}_{lbl_fmt}.pdf'))
+            fig.savefig(os.path.join(BASE_OUTPUT_DIR, f'Test_{M}', f'rse_plot_{case_name}_test_{M}_{lbl_fmt}.png'),
+                        dpi=400)
 
 
      # OUTPUT RSE TO TABLE IN POWERPOINT AND LATEX FORMAT
     output_ppt_table = 1
     if output_ppt_table:
         for M in ['A', 'B', 'C', 'D']:
-            df = ppe_dict[M].rse
+            df = case_dict[case_name][M].rse
             df.fillna(0, inplace=True)
             df.columns = [c.replace('_test', '') for c in df.columns]
-            df.loc['Mean', :] = df.filter(like='cells').mean()
-            with open(os.path.join(BASE_OUTPUT_DIR, f'Test {M}', 'rse_tab.tex'), 'w') as tf:
+            df['Mean'] = df.filter(like='cells').mean()
+            with open(os.path.join(BASE_OUTPUT_DIR, f'Test_{M}', f'rse_tab_{case_name}.tex'), 'w') as tf:
                 tf.write(df.to_latex(float_format="%.0f"))
             # df.insert(0, 'RPT', df.index)
             m, n = df.shape
             col_format = ['.2' for k in range(n)]
-            df_to_powerpoint(os.path.join(BASE_OUTPUT_DIR, f'Test {M}', f"rse_table_test_{M}.pptx"),
+            df_to_powerpoint(os.path.join(BASE_OUTPUT_DIR, f'Test_{M}', f"rse_table_{case_name}_test_{M}.pptx"),
                              df.iloc[:, :-1],
                              col_formatters=col_format,
                              width=19,

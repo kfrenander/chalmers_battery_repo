@@ -15,6 +15,7 @@ dependencies:
  - pip 
  - Pillow
  - plotly
+ - numba
  - pip:
     - pybamm
     - lmfit
@@ -22,3 +23,4 @@ dependencies:
     - mendeleev
     - nidaqmx
     - pyvisa
+    - pyDRTtools

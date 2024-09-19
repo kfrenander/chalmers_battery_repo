@@ -139,12 +139,15 @@ def calc_t_stat(d1, d2):
 if __name__ == '__main__':
     import time
     from check_current_os import get_base_path_batt_lab_data
+    plt.style.use('kelly_colors')
     start = time.time()
+    SCALE = 1.5
+    CASE_NAME = 'reduce'
     data_files = {
-        "Test D": "stat_test/synthetic_data/chng_noise_data/Test_D_increase_noise.pkl",
-        "Test A": "stat_test/synthetic_data/chng_noise_data/Test_A_increase_noise.pkl",
-        "Test B": "stat_test/synthetic_data/chng_noise_data/Test_B_increase_noise.pkl",
-        "Test C": "stat_test/synthetic_data/chng_noise_data/Test_C_increase_noise.pkl"
+        "Test D": f"stat_test/synthetic_data_base_dir/chng_noise_data_sc{SCALE}_updated_method/Test_D_{CASE_NAME}_noise.pkl",
+        "Test A": f"stat_test/synthetic_data_base_dir/chng_noise_data_sc{SCALE}_updated_method/Test_A_{CASE_NAME}_noise.pkl",
+        "Test B": f"stat_test/synthetic_data_base_dir/chng_noise_data_sc{SCALE}_updated_method/Test_B_{CASE_NAME}_noise.pkl",
+        "Test C": f"stat_test/synthetic_data_base_dir/chng_noise_data_sc{SCALE}_updated_method/Test_C_{CASE_NAME}_noise.pkl"
     }
     data_files = sort_dict(data_files)
     BASE_BATT_LAB_DIR = get_base_path_batt_lab_data()
@@ -205,8 +208,8 @@ if __name__ == '__main__':
 
     # PLOT PROBABILITIES OF FALSE CONCLUSIONS FOR TWO TYPES OF T-TEST
     p_fig_ttest_rel = plot_p_fail(p_fail_ttest_rel)
-    p_fig_ttest_rel.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_rel_fce_inc_noise.png'), dpi=400)
-    p_fig_ttest_rel.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_rel_fce_inc_noise.pdf'))
+    p_fig_ttest_rel.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_rel_fce_{CASE_NAME}_noise.png'), dpi=400)
+    p_fig_ttest_rel.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_rel_fce_{CASE_NAME}_noise.pdf'))
 
     # p_fig_ttest_ind = plot_p_fail(p_fail_ttest_ind)
     # p_fig_ttest_ind.savefig(os.path.join(BASE_OUTPUT_DIR, f'fail_prob_ttest_ind_fce.png'), dpi=400)
