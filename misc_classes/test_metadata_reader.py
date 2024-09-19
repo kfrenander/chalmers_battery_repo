@@ -7,17 +7,21 @@ class MetadataReader:
     excel_file_path = None
     excel_data = None
 
-    def __init__(self, file_path=None):
+    def __init__(self, unit=None, machine=None, channel=None, test=None, file_path=None):
         """
-        Initializes the MetadataReader by reading and parsing the metadata file.
+        Initializes the MetadataReader either from a text file or directly from values.
 
         Parameters:
-            file_path (str): The path to the metadata text file.
+            unit (str, optional): The unit identifier.
+            machine (str, optional): The machine identifier.
+            channel (str, optional): The channel identifier.
+            test (str, optional): The test identifier.
+            file_path (str, optional): The path to the metadata text file.
         """
-        self.unit = None
-        self.machine = None
-        self.channel = None
-        self.test = None
+        self.unit = unit
+        self.machine = machine
+        self.channel = channel
+        self.test = test
         self.test_condition = None
         self.cell_id = None
         self.cell_type = None
@@ -76,6 +80,7 @@ class MetadataReader:
                 self.cell_id = matching_rows.iloc[0]['CELL_ID']
                 self.cell_type = matching_rows.iloc[0]['CELL_TYPE']
                 self.project = matching_rows.iloc[0]['PROJECT']
+                self.output_name = matching_rows.iloc[0]['OUTPUT_NAME']
             else:
                 print("No matching data found in the Excel file.")
 
@@ -92,13 +97,56 @@ class MetadataReader:
         """
         BASE_PATH = get_base_path_batt_lab_data()
         cls.excel_file_path = os.path.join(BASE_PATH,
-                                       'neware_test_inventory.xlsx')  # Class variable to store the path to the Excel file
+                                       'neware_test_inventory.xlsx')  # Class variable for the path to the inventory
         try:
             cls.excel_data = pd.read_excel(cls.excel_file_path)
         except FileNotFoundError:
             print(f"Error: The file {cls.excel_file_path} was not found.")
         except Exception as e:
             print(f"An error occurred while reading the Excel file: {e}")
+
+    @classmethod
+    def from_values(cls, unit, machine, channel, test):
+        """
+        Alternative constructor that initializes the MetadataReader from given values.
+
+        Parameters:
+            unit (str): The unit identifier.
+            machine (str): The machine identifier.
+            channel (str): The channel identifier.
+            test (str): The test identifier.
+
+        Returns:
+            MetadataReader: An instance of MetadataReader initialized with the given values.
+        """
+        return cls(unit=unit, machine=machine, channel=channel, test=test)
+
+
+    def output_to_file(self, output_path):
+        """
+        Outputs all metadata information to a text file.
+
+        Parameters:
+            output_path (str): The path to the output text file.
+        """
+        try:
+            with open(output_path, 'w') as file:
+                file.write(f"UNIT: {self.unit}\n")
+                file.write(f"MACHINE: {self.machine}\n")
+                file.write(f"CHANNEL: {self.channel}\n")
+                file.write(f"TEST: {self.test}\n")
+                if self.test_condition:
+                    file.write(f"TEST_CONDITION: {self.test_condition}\n")
+                if self.cell_id:
+                    file.write(f"CELL_ID: {self.cell_id}\n")
+                if self.cell_type:
+                    file.write(f"CELL_TYPE: {self.cell_type}\n")
+                if self.project:
+                    file.write(f"PROJECT: {self.project}\n")
+                if self.output_name:
+                    file.write(f"OUTPUT_NAME: {self.output_name}\n")
+        except Exception as e:
+            print(f"An error occurred while writing to the output file: {e}")
 
     def __repr__(self):
         return (f"MetadataReader(unit={self.unit}, machine={self.machine}, channel={self.channel}, "
@@ -109,17 +157,20 @@ class MetadataReader:
 if __name__ == '__main__':
     BASE_PATH = get_base_path_batt_lab_data()
     # Example usage
-    fname = "pulse_chrg_test\cycling_data_ici\pickle_files_channel_240095_2_7\metadata_240095_2_7_test_2818575237.txt"
+    fname = "pulse_chrg_test/cycling_data_repaired/pickle_files_channel_240095_2_7/metadata_240095_2_7_test_2818575237.txt"
     xl_data_file = 'neware_test_inventory.xlsx'
     xl_file_path = os.path.join(BASE_PATH, xl_data_file)
     file_path = os.path.join(BASE_PATH, fname)
 
-    # Example usage
-    # Set the Excel file path once for the class
-    # MetadataReader.set_excel_file_path(xl_file_path)
+    # Alternative constructor to create an instance from values
+    meta_data_from_values = MetadataReader.from_values(unit='240095', machine='2', channel='1', test='2818575226')
 
     # Replace with the actual path to your metadata file
-    meta_data = MetadataReader(file_path)
+    meta_data = MetadataReader(file_path=file_path)
+
+    # Output to file
+    meta_data.output_to_file(os.path.join(BASE_PATH, 'pulse_chrg_test/cycling_data_repaired/test_output_metadata.txt'))
+
     empty_meta_data = MetadataReader()
 
     # Access metadata attributes
