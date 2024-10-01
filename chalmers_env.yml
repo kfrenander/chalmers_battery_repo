@@ -16,6 +16,8 @@ dependencies:
  - Pillow
  - plotly
  - numba
+ - pytables
+ - h5py
  - pip:
     - pybamm
     - lmfit
