@@ -54,6 +54,13 @@ class DrtAnalyzerWrapper:
         self.df = pd.read_csv(self.log_file, names=['Freq', 'Real', 'Imag'], header=None)
         self.cell_nbr = re.search(r"\d{3}", self.log_file).group()
         self.current_soc = extract_soc(self.log_file)
+        self.test_condition = None
+        self.id_test_condition()
+
+    def id_test_condition(self):
+        base_path = get_base_path_batt_lab_data()
+        db_df = pd.read_excel(os.path.join(base_path, 'neware_test_inventory.xlsx'))
+        self.test_condition = db_df[db_df.CELL_ID == float(self.cell_nbr)]['TEST_CONDITION'].iloc[0]
 
     def run_bayesian(self):
         self.drt_data_set = Bayesian_run(self.drt_data_set,
@@ -109,16 +116,17 @@ class DrtAnalyzerWrapper:
         elif self.drt_data_set.method == 'credit':
             ax.semilogx(self.drt_data_set.tau_fine, self.drt_data_set.gamma,
                         label='MAP',
-                        color='darkgrey',
+                        color='black',
                         linewidth=1)
             ax.semilogx(self.drt_data_set.tau_fine, self.drt_data_set.mean,
                         label='Mean',
                         color='darkblue',
                         linewidth=1)
             ax.fill_between(self.drt_data_set.tau_fine, self.drt_data_set.lower_bound, self.drt_data_set.upper_bound,
-                            facecolor='lightblue')
+                            facecolor='lightblue', alpha=0.7)
         ax.set_xlabel(r'$\tau$  $[s]$')
         ax.set_ylabel(r'$\gamma$  $[\Omega]$')
+        ax.legend()
         return fig, ax
 
 
@@ -153,9 +161,16 @@ def collect_eis_files(parent_folder):
 
 if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
+    from natsort import natsorted
     BASE_PATH = get_base_path_batt_lab_data()
     settings = DrtSettings(use_inductive_part=2)
     settings.export_to_file("C:/Work/test_output.txt")
     eis_data_files = collect_eis_files(os.path.join(BASE_PATH, 'pulse_chrg_test/EIS_for_DRT'))
     db_df = pd.read_excel(os.path.join(BASE_PATH, 'neware_test_inventory.xlsx'))
     drt_analyser_obj = DrtAnalyzerWrapper(eis_data_files['180'][0], settings)
+    drt_analyser_dict = {cell: {extract_soc(file): DrtAnalyzerWrapper(log_file=file, settings=settings)
+                                for file in files if '_after' in file}
+                         for cell, files in eis_data_files.items()}
+    # for cell, dct in drt_analyser_dict.items():
+    #     for soc, drt_obj in natsorted(dct.items()):
+    #         drt_obj.run_bayesian()
