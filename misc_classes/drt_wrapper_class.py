@@ -129,6 +129,61 @@ class DrtAnalyzerWrapper:
         ax.legend()
         return fig, ax
 
+    def plot_drt(self, fig=None, ax=None, label=''):
+        plt_label = f'DRT for {self.test_condition} {label}at {self.current_soc}'
+        if fig is None or ax is None:
+            fig, ax = plt.subplots(1, 1)
+        if self.drt_data_set.method == 'simple':
+            ax.semilogx(self.drt_data_set.tau_fine, self.drt_data_set.gamma,
+                        label=plt_label,
+                        linewidth=1)
+        elif self.drt_data_set.method == 'credit':
+            soc_lvl = re.search(r'\d+', self.current_soc).group()
+            drt_lbl = f'MAP {self.test_condition} at {soc_lvl}SOC'
+            ax.semilogx(self.drt_data_set.tau_fine, self.drt_data_set.gamma,
+                        label=drt_lbl,
+                        linewidth=1)
+        ax.set_xlabel(r'$\tau$  $[s]$')
+        ax.set_ylabel(r'$\gamma$  $[\Omega]$')
+        return fig, ax
+
+    def export_drt(self, path=None):
+        import csv
+        if path is None:
+            output_dir = "C:/Work"
+        if self.drt_data_set.method == 'credit':
+            if path is None:
+                fname = f'Bayesian_DRT_export_{self.cell_nbr}_at_{self.current_soc}.txt'
+                path = os.path.join(output_dir, fname)
+            with open(path, 'w', newline='') as save_file:
+                writer = csv.writer(save_file)
+
+                # first save L and R
+                writer.writerow(['L', self.drt_data_set.L])
+                writer.writerow(['R', self.drt_data_set.R])
+                writer.writerow(['tau', 'MAP', 'Mean', 'Upperbound', 'Lowerbound'])
+
+                # after that, save tau, gamma, mean, upper bound, and lower bound
+                for n in range(self.drt_data_set.out_tau_vec.shape[0]):
+                    writer.writerow([self.drt_data_set.out_tau_vec[n], self.drt_data_set.gamma[n],
+                                     self.drt_data_set.mean[n], self.drt_data_set.upper_bound[n],
+                                     self.drt_data_set.lower_bound[n]])
+        elif self.drt_data_set.method == 'simple':
+            if path is None:
+                fname = f'Simple_DRT_export_{self.cell_nbr}_at_{self.current_soc}.txt'
+                path = os.path.join(output_dir, fname)
+            with open(path, 'w', newline='') as save_file:
+                writer = csv.writer(save_file)
+
+                # first save L and R
+                writer.writerow(['L', self.drt_data_set.L])
+                writer.writerow(['R', self.drt_data_set.R])
+                writer.writerow(['tau', 'gamma'])
+
+                # after that, save tau and gamma
+                for n in range(self.drt_data_set.out_tau_vec.shape[0]):
+                    writer.writerow([self.drt_data_set.out_tau_vec[n], self.drt_data_set.gamma[n]])
+
 
 def extract_soc(log_file):
     """Extracts the state of charge (SOC) from the log file name."""
@@ -162,15 +217,28 @@ def collect_eis_files(parent_folder):
 if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
     from natsort import natsorted
+    import time
     BASE_PATH = get_base_path_batt_lab_data()
     settings = DrtSettings(use_inductive_part=2)
-    settings.export_to_file("C:/Work/test_output.txt")
+    # settings.export_to_file("C:/Work/test_output.txt")
     eis_data_files = collect_eis_files(os.path.join(BASE_PATH, 'pulse_chrg_test/EIS_for_DRT'))
     db_df = pd.read_excel(os.path.join(BASE_PATH, 'neware_test_inventory.xlsx'))
     drt_analyser_obj = DrtAnalyzerWrapper(eis_data_files['180'][0], settings)
     drt_analyser_dict = {cell: {extract_soc(file): DrtAnalyzerWrapper(log_file=file, settings=settings)
                                 for file in files if '_after' in file}
                          for cell, files in eis_data_files.items()}
-    # for cell, dct in drt_analyser_dict.items():
-    #     for soc, drt_obj in natsorted(dct.items()):
-    #         drt_obj.run_bayesian()
+    i = 1
+    global_start = time.time()
+    for cell, dct in drt_analyser_dict.items():
+        for soc, drt_obj in natsorted(dct.items()):
+            soc_val = re.search(r'SOC(\d+)', soc).group()
+            soc_lvls = [0, 50, 100]
+            if soc_val in [f'SOC{val}' for val in soc_lvls]:
+                exp_vals = len(drt_analyser_dict) * len(soc_lvls)
+                print(f'Fit number {i} of expected {exp_vals}\nPerforming Bayesian fit for {soc_val} from {cell}. \n')
+                tic = time.time()
+                drt_obj.run_bayesian()
+                toc = time.time()
+                print(f'Elapsed time is {toc - tic:.2f}s for iteration {i}')
+                i += 1
+                drt_obj.export_drt()
