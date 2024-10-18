@@ -3,7 +3,6 @@ import re
 import pandas as pd
 import numpy as np
 from scipy.integrate import trapz
-from rpt_data_analysis.test_name_registry import initiate_test_names
 from misc_classes.test_metadata_reader import MetadataReader
 
 
@@ -116,7 +115,7 @@ class CycleAgeingDataIndexer:
 
     def run(self, top_directory, project_key='pulse_charging'):
         self.top_dir = top_directory
-        self.test_naming = initiate_test_names(proj_key=project_key)
+        self.test_naming = initiate_test_names_pulse_charge()
         self.index_data()
         self.fill_ageing_data()
         self.generate_replicate_combined_data()
@@ -169,10 +168,9 @@ class CycleAgeingDataReader:
         for file in self.pkl_files:
             if 'metadata' in file:
                 try:
-                    self.meta_data = MetadataReader(file)
+                    self.meta_data = MetadataReader(file_path=file)
                 except Exception as e:
                     print(f'Error occured when reading metadata from {file}: {e}')
-
 
     def read_ica_data(self):
         self.ica_data = {}

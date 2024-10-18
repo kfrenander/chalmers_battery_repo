@@ -5,44 +5,49 @@ import re
 import os
 
 
-plot_style = 'large_scale'
-if plot_style == 'large_scale':
-    x_width = 8
-    aspect_rat = 12 / 16
-    plt.rcParams['figure.figsize'] = x_width, aspect_rat * x_width
-    plt.rcParams['legend.fontsize'] = 16
-    plt.rcParams['axes.labelsize'] = 18
-    plt.rcParams['axes.titlesize'] = 20
-    plt.rcParams['lines.linewidth'] = 1.7
-    plt.rcParams['xtick.labelsize'] = 14
-    plt.rcParams['ytick.labelsize'] = 14
-    lbl_font = {'weight': 'normal',
-                'size': 18}
-    plt.rc('legend', fontsize=14)
-    peak_mark_size = 15
-    mark_size = 5
-    cap_size = 6
-elif plot_style == 'double_col':
-    x_width = 3.25
-    aspect_rat = 3 / 4
-    plt.rcParams['figure.figsize'] = x_width, aspect_rat * x_width
-    plt.rcParams['legend.fontsize'] = 9
-    plt.rcParams['axes.labelsize'] = 9
-    plt.rcParams['axes.titlesize'] = 9
-    plt.rcParams['lines.linewidth'] = 1
-    plt.rcParams['xtick.labelsize'] = 9
-    plt.rcParams['ytick.labelsize'] = 9
-    lbl_font = {'weight': 'normal',
-                'size': 9}
-    plt.rc('legend', fontsize=8)
-    plt.rc('font', **{"family": 'sans-serif', 'sans-serif': 'Helvetica'})
-    mark_size = 2
-    cap_size = 3
-    peak_mark_size = 6.5
-plt.rcParams['axes.grid'] = True
-plt.rcParams['text.usetex'] = True
-plt.rcParams['text.latex.preamble'] = r'\usepackage{siunitx}'
-output_dir = r'Z:\Provning\Analysis\pulse_charge'
+# plot_style = 'large_scale'
+# if plot_style == 'large_scale':
+#     x_width = 8
+#     aspect_rat = 12 / 16
+#     plt.rcParams['figure.figsize'] = x_width, aspect_rat * x_width
+#     plt.rcParams['legend.fontsize'] = 16
+#     plt.rcParams['axes.labelsize'] = 18
+#     plt.rcParams['axes.titlesize'] = 20
+#     plt.rcParams['lines.linewidth'] = 1.7
+#     plt.rcParams['xtick.labelsize'] = 14
+#     plt.rcParams['ytick.labelsize'] = 14
+#     lbl_font = {'weight': 'normal',
+#                 'size': 18}
+#     plt.rc('legend', fontsize=14)
+#     peak_mark_size = 15
+#     mark_size = 5
+#     cap_size = 6
+# elif plot_style == 'double_col':
+#     x_width = 3.25
+#     aspect_rat = 3 / 4
+#     plt.rcParams['figure.figsize'] = x_width, aspect_rat * x_width
+#     plt.rcParams['legend.fontsize'] = 9
+#     plt.rcParams['axes.labelsize'] = 9
+#     plt.rcParams['axes.titlesize'] = 9
+#     plt.rcParams['lines.linewidth'] = 1
+#     plt.rcParams['xtick.labelsize'] = 9
+#     plt.rcParams['ytick.labelsize'] = 9
+#     lbl_font = {'weight': 'normal',
+#                 'size': 9}
+#     plt.rc('legend', fontsize=8)
+#     plt.rc('font', **{"family": 'sans-serif', 'sans-serif': 'Helvetica'})
+#     mark_size = 2
+#     cap_size = 3
+#     peak_mark_size = 6.5
+# plt.rcParams['axes.grid'] = True
+plt.style.use('posterformat')
+mark_size = 5
+cap_size = 6
+plt.rcParams.update({
+            "text.usetex": True,
+            "text.latex.preamble": r'\usepackage{siunitx}'
+        })
+output_dir = r'Z:\Provning\Analysis\pulse_charge\FirstBatch'
 
 
 def calculate_fce_from_rpt(rpt_str):
@@ -54,10 +59,12 @@ def calculate_fce_from_rpt(rpt_str):
 if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
     BASE_DATA_PATH = get_base_path_batt_lab_data()
-    #data_loc = r"\\sol.ita.chalmers.se\groups\batt_lab_data\pulse_chrg_test\cycling_data"
     data_loc = os.path.join(BASE_DATA_PATH, 'pulse_chrg_test/cycling_data')
     cycle_data = CycleAgeingDataIndexer()
     cycle_data.run(data_loc)
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     fig, ax = plt.subplots(1, 1)
     for k, ag_data in cycle_data.ageing_data.items():
@@ -69,7 +76,7 @@ if __name__ == '__main__':
     plt.legend(ncols=2)
     ax.set_xlabel('FCE [-]')
     ax.set_ylabel('Capacity retention [-]')
-    ax.grid(alpha=0.4)
+    fig.savefig(os.path.join(output_dir, 'all_cells_relative_capacity.png'), dpi=400)
 
     fig, ax = plt.subplots(1, 1)
     for t_name, cmb_dat in cycle_data.combined_data.items():
@@ -80,7 +87,7 @@ if __name__ == '__main__':
     plt.legend(ncols=2)
     ax.set_xlabel('FCE [-]')
     ax.set_ylabel('Capacity retention [-]')
-    ax.grid(alpha=0.4)
+    fig.savefig(os.path.join(output_dir, 'mean_cap_all_cases.png'), dpi=400)
 
     fig, ax = plt.subplots(1, 1)
     for t_name, cmb_dat in cycle_data.combined_data.items():
