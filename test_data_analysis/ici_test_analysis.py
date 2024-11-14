@@ -8,7 +8,9 @@ from test_data_analysis.read_neware_files import NewareDataReader
 from check_current_os import get_base_path_batt_lab_data
 from test_data_analysis.rpt_analysis import characterise_steps
 import natsort
-plt.style.use('kelly_colors')
+from numba import njit
+from scipy.signal.windows import gaussian
+plt.style.use(['widthsixinches', 'kelly_colors'])
 plt.rcParams.update({
     "text.usetex": True,
     "font.family": "Helvetica",
@@ -98,12 +100,49 @@ def fit_lin_ocp_slope(df, col):
     return coeffs, residual
 
 
+def extract_ica_from_ici(df, col, curr_mode='chrg'):
+    v_flt = 5e-3
+    idx_to_remove = []
+    if curr_mode=='chrg':
+        volt_mark = 0
+        for i in range(len(df)):
+            if df[col].iloc[i] > volt_mark + v_flt:
+                volt_mark = df[col].iloc[i]
+            else:
+                idx_to_remove.append(df.index[i])
+        ica_df = df.copy()
+        ica_df = ica_df.drop(index=idx_to_remove).reset_index(drop=True)
+        ica_df['ica_raw'] = np.gradient(ica_df.mAh, ica_df.volt)
+        ica_df['ica_gauss'] = gaussian_filtering(ica_df, 'ica_raw')
+    elif curr_mode=='dchg':
+        volt_mark = 5
+        for i in range(len(df)):
+            if df[col].iloc[i] < volt_mark - v_flt:
+                volt_mark = df[col].iloc[i]
+            else:
+                idx_to_remove.append(df.index[i])
+        ica_df = df.copy()
+        ica_df = ica_df.drop(index=idx_to_remove).reset_index(drop=True)
+        ica_df['ica_raw'] = np.gradient(ica_df.mAh, ica_df.volt)
+        ica_df['ica_gauss'] = gaussian_filtering(ica_df, 'ica_raw')
+    return ica_df
+
+
+def gaussian_filtering(df, col):
+    N = np.floor(0.033 * len(df))
+    N = N - 1 + N%2
+    gauss_win = gaussian(N, 14/5)
+    flt_data = np.convolve(df[col], gauss_win, mode='same') / sum(gauss_win)
+    return flt_data
+
+
 def perform_ici_analysis(pkl_file):
     ici_df = pd.read_pickle(pkl_file)
+    ica_df = extract_ica_from_ici(ici_df, col='volt', curr_mode='chrg')
     proc_df = characterise_steps(ici_df)
     proc_df = categorize_step(proc_df)
     proc_df = find_ici_parameters(ici_df, proc_df)
-    return proc_df
+    return proc_df, ica_df
 
 
 def run_ici_analysis_on_path(base_path):
@@ -111,9 +150,11 @@ def run_ici_analysis_on_path(base_path):
         for file in files:
             if file.endswith('.pkl') and 'ici_dump' in file:
                 print(f'Processing {file} from {os.path.split(root)[-1]}')
-                tmp_df = perform_ici_analysis(os.path.join(root, file))
+                tmp_df, ica_df = perform_ici_analysis(os.path.join(root, file))
                 output_file = os.path.join(root, file.replace('dump', 'processed'))
-                tmp_df.to_pickle(output_file)
+                output_ica = os.path.join(root, file.replace('ici', 'ica'))
+                # tmp_df.to_pickle(output_file)
+                ica_df.to_pickle(output_ica)
     return None
 
 
