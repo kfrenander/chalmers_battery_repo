@@ -4,7 +4,7 @@ import os
 import re
 from misc_classes.test_metadata_reader import MetadataReader
 import matplotlib.pyplot as plt
-from test_data_analysis.read_neware_files import NewareDataReader
+from scipy.ndimage import gaussian_filter1d
 from check_current_os import get_base_path_batt_lab_data
 from test_data_analysis.rpt_analysis import characterise_steps
 import natsort
@@ -100,31 +100,72 @@ def fit_lin_ocp_slope(df, col):
     return coeffs, residual
 
 
-def extract_ica_from_ici(df, col, curr_mode='chrg'):
-    v_flt = 5e-3
+@njit
+def filter_indices(voltages, indices, mode, v_flt):
     idx_to_remove = []
-    if curr_mode=='chrg':
-        volt_mark = 0
-        for i in range(len(df)):
-            if df[col].iloc[i] > volt_mark + v_flt:
-                volt_mark = df[col].iloc[i]
-            else:
-                idx_to_remove.append(df.index[i])
-        ica_df = df.copy()
-        ica_df = ica_df.drop(index=idx_to_remove).reset_index(drop=True)
-        ica_df['ica_raw'] = np.gradient(ica_df.mAh, ica_df.volt)
-        ica_df['ica_gauss'] = gaussian_filtering(ica_df, 'ica_raw')
-    elif curr_mode=='dchg':
-        volt_mark = 5
-        for i in range(len(df)):
-            if df[col].iloc[i] < volt_mark - v_flt:
-                volt_mark = df[col].iloc[i]
-            else:
-                idx_to_remove.append(df.index[i])
-        ica_df = df.copy()
-        ica_df = ica_df.drop(index=idx_to_remove).reset_index(drop=True)
-        ica_df['ica_raw'] = np.gradient(ica_df.mAh, ica_df.volt)
-        ica_df['ica_gauss'] = gaussian_filtering(ica_df, 'ica_raw')
+    volt_mark = 0 if mode == 'chrg' else 5
+
+    for i in range(len(voltages)):
+        if (mode == 'chrg' and voltages[i] > volt_mark + v_flt) or \
+                (mode == 'dchg' and voltages[i] < volt_mark - v_flt):
+            volt_mark = voltages[i]
+        else:
+            idx_to_remove.append(indices[i])  # Append the actual index value
+
+    return np.array(idx_to_remove)
+
+
+@njit
+def filter_indices_positive(voltages, indices, mode, v_flt):
+    idx_to_retain = []
+    volt_mark = 0 if mode == 'chrg' else 5
+
+    for i in range(len(voltages)):
+        if (mode == 'chrg' and voltages[i] > volt_mark + v_flt) or \
+                (mode == 'dchg' and voltages[i] < volt_mark - v_flt):
+            volt_mark = voltages[i]
+            idx_to_retain.append(indices[i])
+
+    return np.array(idx_to_retain)
+
+
+def extract_ica_from_ici(df, col):
+    v_flt = 5e-3
+    modes = {'chrg': {'first_index': df[df['mode'] == 'CC Chg'].first_valid_index(),
+                      'volt_mark': 0,
+                      'mAh_factor': 1},
+             'dchg': {'first_index': df[df['mode'] == 'CC DChg'].first_valid_index(),
+                      'volt_mark': 5,
+                      'mAh_factor': -1}}
+
+    chrg_first_idx = modes['chrg']['first_index']
+    dchg_first_idx = modes['dchg']['first_index']
+
+    if chrg_first_idx < dchg_first_idx:
+        df_chrg = df.loc[:dchg_first_idx - 1]
+        df_dchg = df.loc[dchg_first_idx:]
+    else:
+        df_chrg = df.loc[chrg_first_idx:]
+        df_dchg = df.loc[:chrg_first_idx - 1]
+
+    # Process charge and discharge dataframes
+    dfs = {}
+    for mode in ['chrg', 'dchg']:
+        voltages = (df_chrg if mode == 'chrg' else df_dchg)[col].values
+        indices = (df_chrg if mode == 'chrg' else df_dchg).index.values
+        idx_to_keep = filter_indices_positive(voltages, indices, mode, v_flt)
+
+        ica_df = df.loc[idx_to_keep, :].copy()
+
+        # Compute the gradient for 'ica_raw' and apply Gaussian filtering
+        ica_df['ica_raw'] = np.gradient(modes[mode]['mAh_factor'] * ica_df['mAh'], ica_df['volt'])
+        ica_df['ica_gauss'] = gaussian_filter1d(ica_df['ica_raw'], sigma=1.3, mode='nearest')
+        # ica_df['ica_gauss'] = gaussian_filtering(ica_df, 'ica_raw')
+
+        dfs[mode] = ica_df
+
+    # Merge the charge and discharge dataframes
+    ica_df = pd.concat(dfs.values(), axis=0, ignore_index=True)
     return ica_df
 
 
@@ -138,7 +179,7 @@ def gaussian_filtering(df, col):
 
 def perform_ici_analysis(pkl_file):
     ici_df = pd.read_pickle(pkl_file)
-    ica_df = extract_ica_from_ici(ici_df, col='volt', curr_mode='chrg')
+    ica_df = extract_ica_from_ici(ici_df, col='volt')
     proc_df = characterise_steps(ici_df)
     proc_df = categorize_step(proc_df)
     proc_df = find_ici_parameters(ici_df, proc_df)
@@ -329,7 +370,7 @@ def extract_averages(subfolder_filter_list, avg_param='k'):
 BASE_PATH = get_base_path_batt_lab_data()
 DATA_BASE_PATH = os.path.join(BASE_PATH, 'pulse_chrg_test/cycling_data_repaired')
 
-# run_ici_analysis_on_path(DATA_BASE_PATH)
+run_ici_analysis_on_path(DATA_BASE_PATH)
 subfolder_filters = [('2', '1'), ('2', '3'), ('3', '8')]  # Example tuples to filter subfolders by y and z
 rpt_filters = [1, 10]  # Example rpt numbers to include
 smpl = sample_tests(DATA_BASE_PATH, subfolder_filters, rpt_filters)
