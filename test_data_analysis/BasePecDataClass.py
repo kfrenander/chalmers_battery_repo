@@ -32,6 +32,42 @@ def find_step_characteristics(df):
     return df_out
 
 
+def find_step_characteristics_fast(df):
+    date_fmt = '%m/%d/%Y %H:%M:%S'
+
+    # Group by `unq_step` and calculate required metrics
+    grouped = df.groupby('unq_step')
+
+    # Precompute values using groupby and aggregation
+    step_data = grouped.agg(
+        avg_curr=('curr', 'mean'),
+        max_volt=('volt', 'max'),
+        min_volt=('volt', 'min'),
+        dur=('float_time', lambda x: x.max() - x.min()),
+        step_dur=('step_time', 'max'),
+        stp_cap=('step_cap', lambda x: x.abs().max()),
+        stp_date=('abs_time', 'first'),
+    ).reset_index()
+
+    # Add the step mode as a separate column
+    step_data['step_mode'] = step_data['avg_curr'].apply(BasePecData.check_step_mode)
+
+    # Create the resulting DataFrame with rounded values
+    step_data['maxV'] = step_data['max_volt'].round(3)
+    step_data['minV'] = step_data['min_volt'].round(3)
+
+    # Reorganize columns to match the original structure
+    df_out = step_data.rename(columns={
+        'unq_step': 'step_nbr',
+        'avg_curr': 'curr',
+        'dur': 'duration',
+        'step_dur': 'step_duration',
+        'stp_cap': 'cap'
+    })[['stp_date', 'maxV', 'minV', 'cap', 'curr', 'duration', 'step_duration', 'step_nbr', 'step_mode']]
+
+    return df_out.set_index('step_nbr', drop=False)
+
+
 class BasePecData(object):
 
     def __init__(self, fname, data_init_row=24):
@@ -44,8 +80,8 @@ class BasePecData(object):
         self.col_name_dict = self.make_rename_column_dict()
         self.dyn_data = self.read_pec_file(fname)
         self.meta_data_dict = self.read_pec_metadata()
-        self.dyn_data = self.fill_step_cap()
-        self.step_info = find_step_characteristics(self.dyn_data)
+        self.dyn_data = self.fill_step_cap_fast()
+        self.step_info = find_step_characteristics_fast(self.dyn_data)
         # self.find_all_rpt()
         # self.find_ici()
 
@@ -164,6 +200,25 @@ class BasePecData(object):
     def fill_step_cap(self):
         return self.dyn_data.groupby(by='unq_step', group_keys=False).apply(self.calc_step_cap)
 
+    def fill_step_cap_fast(self):
+        df = self.dyn_data
+        df['step_cap'] = (
+            df.groupby(by='unq_step')
+            .apply(lambda g: cumtrapz(g['curr'], g['step_time'], initial=0) / 3.6)
+            .explode()
+            .to_numpy()
+        )
+        return df
+
+    def fill_step_egy_fast(self):
+        df = self.dyn_data
+        df['step_egy'] = (
+            df.groupby(by='unq_step')
+            .apply(lambda group: cumtrapz(group.curr * group.volt, group.step_time, initial=0)/3.6).
+            explode().to_numpy()
+        )
+        return df
+
     def fill_step_egy(self):
         return self.dyn_data.groupby(by='unq_step', group_keys=False).apply(self.calc_step_egy)
 
@@ -191,5 +246,8 @@ class BasePecRpt(object):
 
 
 if __name__ == '__main__':
-    test_case = r"\\sol.ita.chalmers.se\groups\batt_lab_data\smart_cell_JG\TestBatch2_autumn2023\Test2441_Cell-1.csv"
+    from check_current_os import get_base_path_batt_lab_data
+    import os
+    BASE_PATH = get_base_path_batt_lab_data()
+    test_case = os.path.join(BASE_PATH, "smart_cell_JG\TestBatch2_autumn2023\Test2441_Cell-1.csv")
     fault_trace_data = BasePecData(test_case)
