@@ -12,7 +12,7 @@ def find_step_characteristics(df):
         max_volt = sub_df.volt.max()
         min_volt = sub_df.volt.min()
         dur = sub_df.float_time.max() - sub_df.float_time.min()
-        step_dur = sub_df.step_time.max()
+        step_dur = sub_df.float_step_time.max()
         stp_cap = sub_df.step_cap.abs().max()
         stp_mode = BasePecData.check_step_mode(avg_curr)
         stp_date = sub_df['abs_time'].iloc[0]
@@ -44,7 +44,7 @@ def find_step_characteristics_fast(df):
         max_volt=('volt', 'max'),
         min_volt=('volt', 'min'),
         dur=('float_time', lambda x: x.max() - x.min()),
-        step_dur=('step_time', 'max'),
+        step_dur=('float_step_time', 'max'),
         stp_cap=('step_cap', lambda x: x.abs().max()),
         stp_date=('abs_time', 'first'),
     ).reset_index()
@@ -81,6 +81,7 @@ class BasePecData(object):
         self.dyn_data = self.read_pec_file(fname)
         self.meta_data_dict = self.read_pec_metadata()
         self.dyn_data = self.fill_step_cap_fast()
+        self.dyn_data = self.fill_step_egy_fast()
         self.step_info = find_step_characteristics_fast(self.dyn_data)
         # self.find_all_rpt()
         # self.find_ici()
@@ -117,7 +118,7 @@ class BasePecData(object):
                          'instruction',
                          'cycle',
                          'float_time',
-                         'step_time',
+                         'float_step_time',
                          'abs_time',
                          'volt',
                          'curr',
@@ -146,10 +147,11 @@ class BasePecData(object):
             raw_df = pd.read_csv(fname, skiprows=self.data_init_row)
             raw_df.columns = [self.col_name_dict[c] for c in raw_df.columns]
         except (pd.errors.ParserError, KeyError):
-            print(f'Error detected for initrow = {self.data_init_row}')
             self.data_init_row = find_data_init_row(fname)
+            print(f'Error detected for default initrow \nRe-initiating initrow to {self.data_init_row}.')
             raw_df = pd.read_csv(fname, skiprows=self.data_init_row)
-            raw_df.columns = [self.col_name_dict[c] for c in raw_df.columns]
+            # raw_df.columns = [self.col_name_dict[c] for c in raw_df.columns]
+            raw_df.rename(self.col_name_dict, axis=1, inplace=True)
         raw_df['abs_time'] = pd.to_datetime(raw_df.abs_time)
         raw_df.loc[:, 'mAh'] = cumtrapz(raw_df.curr, raw_df.float_time, initial=0) / 3600
         nbr_of_unique_steps = raw_df[raw_df.step.diff() != 0].shape[0]
@@ -189,12 +191,12 @@ class BasePecData(object):
 
     @staticmethod
     def calc_step_cap(group):
-        group['step_cap'] = cumtrapz(group.curr, group.step_time, initial=0) / 3.6
+        group['step_cap'] = cumtrapz(group.curr, group.float_step_time, initial=0) / 3.6
         return group
 
     @staticmethod
     def calc_step_egy(group):
-        group['step_egy'] = cumtrapz(group.curr * group.volt, group.step_time, initial=0) / 3.6
+        group['step_egy'] = cumtrapz(group.curr * group.volt, group.float_step_time, initial=0) / 3.6
         return group
 
     def fill_step_cap(self):
@@ -204,7 +206,7 @@ class BasePecData(object):
         df = self.dyn_data
         df['step_cap'] = (
             df.groupby(by='unq_step')
-            .apply(lambda g: cumtrapz(g['curr'], g['step_time'], initial=0) / 3.6)
+            .apply(lambda g: cumtrapz(g['curr'], g['float_step_time'], initial=0) / 3.6)
             .explode()
             .to_numpy()
         )
@@ -214,7 +216,7 @@ class BasePecData(object):
         df = self.dyn_data
         df['step_egy'] = (
             df.groupby(by='unq_step')
-            .apply(lambda group: cumtrapz(group.curr * group.volt, group.step_time, initial=0)/3.6).
+            .apply(lambda group: cumtrapz(group.curr * group.volt, group.float_step_time, initial=0)/3.6).
             explode().to_numpy()
         )
         return df
