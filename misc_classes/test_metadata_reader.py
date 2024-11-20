@@ -157,7 +157,7 @@ class MetadataReader:
 if __name__ == '__main__':
     BASE_PATH = get_base_path_batt_lab_data()
     # Example usage
-    fname = "pulse_chrg_test/cycling_data_repaired/pickle_files_channel_240095_2_7/metadata_240095_2_7_test_2818575237.txt"
+    fname = "pulse_chrg_test/cycling_data_repaired/pickle_files_channel_240095_2_7_100mHz/metadata_240095_2_7_test_2818575237.txt"
     xl_data_file = 'neware_test_inventory.xlsx'
     xl_file_path = os.path.join(BASE_PATH, xl_data_file)
     file_path = os.path.join(BASE_PATH, fname)
