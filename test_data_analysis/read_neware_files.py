@@ -72,6 +72,9 @@ class NewareDataReader:
         elif self.ver_id == 'v76':
             stat_sheet = [sh_name for sh_name in self.xl_files[0].sheet_names if 'Statis_' in sh_name]
             stat_df = self.xl_files[0].parse(stat_sheet[0])
+        if stat_df.empty:
+            print(f'Empty statistics data for {self.file_paths}')
+            return stat_df
         self._id_language(stat_df)
         if self.chinese:
             stat_df = self._translate_column_names(stat_df)
@@ -87,6 +90,9 @@ class NewareDataReader:
         elif self.ver_id == 'v76':
             cycle_sheet = [sh_name for sh_name in self.xl_files[0].sheet_names if 'Cycle' in sh_name]
             cycle_df = self.xl_files[0].parse(cycle_sheet[0])
+        if cycle_df.empty:
+            print(f'Empty cycle data for {self.file_paths}')
+            return cycle_df
         self._id_language(cycle_df)
         if self.chinese:
             cycle_df = self._translate_column_names(cycle_df)
@@ -105,10 +111,8 @@ class NewareDataReader:
         if self.chinese:
             df = self._translate_column_names(df)
             df = self._translate_mode_names(df)
-        df['arb_step2'] = (df['Step Index'].diff() != 0).cumsum()
         df = self._process_dataframe(df)
         df = self._update_dataframe_times(df)
-        df['float_time'] = pd.to_timedelta(df['total_time']).astype('int64') / 1e9
         return df
 
     def _read_neware_v76_xls(self, xl_file, curr_unit='milli'):
@@ -171,8 +175,6 @@ class NewareDataReader:
         df['step_time'] = pd.to_timedelta(df.rel_time).astype('timedelta64[ms]')
         df['abs_time'] = pd.to_datetime(df['abs_time'], format='%Y-%m-%d %H:%M:%S')
         df['float_step_time'] = df.step_time.apply(lambda x: x.total_seconds())
-        posix_time = df['abs_time'].apply(lambda x: x.timestamp())
-        df['float_time'] = posix_time - posix_time[0]
         return df
 
     def _find_curr_unit(self, col):
@@ -235,6 +237,8 @@ class NewareDataReader:
         df['c_rate'] = df['c_rate'].fillna(method='ffill').fillna(0)
 
     def _calculate_cumulative_values(self, df):
+        if self.ver_id == 'v80':
+            df['arb_step2'] = (df['orig_step'].diff() != 0).cumsum()
         posix_time = df['abs_time'].apply(lambda x: x.timestamp())
         df['float_time'] = posix_time - posix_time[0]
         df['mAh'] = cumtrapz(df.curr, df.float_time / 3.6, initial=0)
