@@ -15,7 +15,7 @@ def initiate_test_names_pulse_charge():
         '100mHz Pulse Charge',
         '100mHz Pulse Charge no pulse discharge',
         '10mHz Pulse Charge',
-        'Reference test 2.5 A',
+        'Reference test constant current',
     ]
     return test_name_list
 
