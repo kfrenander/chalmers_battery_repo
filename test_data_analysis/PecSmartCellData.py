@@ -53,7 +53,11 @@ class PecSmartCellData(PecLifeTestData):
             'Test2484': 'Failed Li plating test',
             'Test2498': 'Test with slow rise'
         }
-        return test_name_dict[self.test_nbr]
+        try:
+            return test_name_dict[self.test_nbr]
+        except KeyError:
+            print(f'Key{self.test_nbr} not found. Return default.')
+            return 'Default_unknown_test'
 
 
 class PecSmartCellRpt(BasePecRpt):
@@ -149,5 +153,9 @@ class PecSmartCellRpt(BasePecRpt):
 
 
 if __name__ == '__main__':
-    test_file = r"\\sol.ita.chalmers.se\groups\batt_lab_data\smart_cell_JG\TestBatch2_autumn2023\Test2498_Cell-1.csv"
+    from check_current_os import get_base_path_batt_lab_data
+    import os
+    BASE_PATH = get_base_path_batt_lab_data()
+    test_file_path = r"smart_cell_JG\TestBatch2_autumn2023\Test2498_Cell-1.csv"
+    test_file = os.path.join(BASE_PATH, test_file_path)
     class_test = PecSmartCellData(test_file, op_bool=1)
