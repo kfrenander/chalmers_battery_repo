@@ -4,6 +4,13 @@ import pandas as pd
 import numpy as np
 import re
 import matplotlib.pyplot as plt
+import dill
+
+
+class CellStyle:
+    def __init__(self, color, marker):
+        self.color = color
+        self.marker = marker
 
 
 class DrtSettings:
@@ -139,7 +146,7 @@ class DrtAnalyzerWrapper:
                         linewidth=1)
         elif self.drt_data_set.method == 'credit':
             soc_lvl = re.search(r'\d+', self.current_soc).group()
-            drt_lbl = f'MAP {self.test_condition} at {soc_lvl}SOC'
+            drt_lbl = f'MAP {self.test_condition} at SOC{soc_lvl}'
             ax.semilogx(self.drt_data_set.tau_fine, self.drt_data_set.gamma,
                         label=drt_lbl,
                         linewidth=1)
@@ -147,13 +154,26 @@ class DrtAnalyzerWrapper:
         ax.set_ylabel(r'$\gamma$  $[\Omega]$')
         return fig, ax
 
-    def export_drt(self, path=None):
+    def dump_drt(self, path=None, file_tag=''):
+        import dill
+        if path is None:
+            output_dir = "Z:/Provning/Analysis/pulse_charge/DRT/full_data"
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+        fname = f'DRT_class_{file_tag}{self.cell_nbr}_at_{self.current_soc}.pkl'
+        path = os.path.join(output_dir, fname)
+        with open(path, 'wb') as f:
+            dill.dump(self, f)
+
+    def export_drt(self, path=None, file_tag=''):
         import csv
         if path is None:
-            output_dir = "C:/Work"
+            output_dir = "Z:/Provning/Analysis/pulse_charge/DRT/fit_data"
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
         if self.drt_data_set.method == 'credit':
             if path is None:
-                fname = f'Bayesian_DRT_export_{self.cell_nbr}_at_{self.current_soc}.txt'
+                fname = f'Bayesian_DRT_export_{file_tag}{self.cell_nbr}_at_{self.current_soc}.txt'
                 path = os.path.join(output_dir, fname)
             with open(path, 'w', newline='') as save_file:
                 writer = csv.writer(save_file)
@@ -170,7 +190,7 @@ class DrtAnalyzerWrapper:
                                      self.drt_data_set.lower_bound[n]])
         elif self.drt_data_set.method == 'simple':
             if path is None:
-                fname = f'Simple_DRT_export_{self.cell_nbr}_at_{self.current_soc}.txt'
+                fname = f'Simple_DRT_export_{file_tag}{self.cell_nbr}_at_{self.current_soc}.txt'
                 path = os.path.join(output_dir, fname)
             with open(path, 'w', newline='') as save_file:
                 writer = csv.writer(save_file)
@@ -183,6 +203,8 @@ class DrtAnalyzerWrapper:
                 # after that, save tau and gamma
                 for n in range(self.drt_data_set.out_tau_vec.shape[0]):
                     writer.writerow([self.drt_data_set.out_tau_vec[n], self.drt_data_set.gamma[n]])
+        elif self.drt_data_set.method == 'none':
+            print(f'No fit available for {self.cell_nbr} at {self.current_soc}')
 
 
 def extract_soc(log_file):
@@ -218,8 +240,9 @@ if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
     from natsort import natsorted
     import time
+    import itertools
     BASE_PATH = get_base_path_batt_lab_data()
-    settings = DrtSettings(use_inductive_part=2)
+    settings = DrtSettings(use_inductive_part=1)
     # settings.export_to_file("C:/Work/test_output.txt")
     eis_data_files = collect_eis_files(os.path.join(BASE_PATH, 'pulse_chrg_test/EIS_for_DRT'))
     db_df = pd.read_excel(os.path.join(BASE_PATH, 'neware_test_inventory.xlsx'))
@@ -232,13 +255,103 @@ if __name__ == '__main__':
     for cell, dct in drt_analyser_dict.items():
         for soc, drt_obj in natsorted(dct.items()):
             soc_val = re.search(r'SOC(\d+)', soc).group()
-            soc_lvls = [0, 50, 100]
+            soc_lvls = range(0, 110, 10)
             if soc_val in [f'SOC{val}' for val in soc_lvls]:
                 exp_vals = len(drt_analyser_dict) * len(soc_lvls)
                 print(f'Fit number {i} of expected {exp_vals}\nPerforming Bayesian fit for {soc_val} from {cell}. \n')
                 tic = time.time()
                 drt_obj.run_bayesian()
                 toc = time.time()
-                print(f'Elapsed time is {toc - tic:.2f}s for iteration {i}')
+                print(f'Elapsed time is {toc - tic:.2f}s for iteration {i}\n\n')
                 i += 1
-                drt_obj.export_drt()
+                try:
+                    drt_obj.export_drt(file_tag='with_inductive_')
+                except FileExistsError:
+                    print(f'Case {cell} at {soc_val} already exported')
+                except Exception as e:
+                    print(f'Error {e} for {cell} at {soc_val}')
+
+    plot_boolean = 1
+    if plot_boolean:
+        plt.style.use(['widthsixinches'])
+        plt.rcParams.update({
+            "text.usetex": True,
+            "font.family": "Times New Roman",
+            "text.latex.preamble": r'\usepackage{siunitx}'
+        })
+        output_dir = "Z:/Provning/Analysis/pulse_charge/DRT/figures_w_inductance"
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        # Get the default matplotlib color cycle
+        color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+        # Define the markers to cycle through for each cell
+        marker_cycle = itertools.cycle(['o', 's', '^', 'D', 'P', '*', 'x', '+', 'v'])
+
+        # Create a style dictionary using the default matplotlib colors and cycling through markers
+        style_dict = {
+            str(cell): CellStyle(color=color, marker=next(marker_cycle))
+            for cell, color in zip([180, 182, 184, 186, 190, 192, 194, 196, 199], color_cycle)
+        }
+        x_fig, y_fig = plt.rcParams['figure.figsize']
+        plt.rcParams['figure.autolayout'] = False
+
+        # Create a 2x1 grid of subplots
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(2 * x_fig, 2 * y_fig))  # Increase width and height
+
+        # List of cells to plot
+        # 180 is 10mHz
+        # 182 is 320mHz
+        # 184 is 500mHz
+        # 186 is reference cycled
+        # 199 is reference fresh
+        # 190 is 1000mHz no pulse dchg
+        # 192 is 1000mHz
+        # 194 is 100mHz no pulse dchg
+        # 196 is 100mHz
+        # 199 is fresh cell
+        # 210 is replicate fresh cell
+        cells_to_plot = [180, 192, 196, 199]
+
+        label_fnt_sz = 15.5
+        soc_fltr = 'SOC50'
+        # Loop through your data and plot on both subplots
+        for cell, dct in drt_analyser_dict.items():
+            if int(cell) in cells_to_plot:
+                for soc, drt_obj in natsorted(dct.items()):
+                    if soc_fltr in soc and drt_obj.drt_data_set.method == 'credit':
+                        style = style_dict[cell]
+                        # Plot on the first subplot
+                        fig, ax2 = drt_obj.plot_drt(fig=fig, ax=ax2)
+                        ax2.lines[-1].set_color(style.color)
+                        # Scatter on the second subplot
+                        lbl = f'{drt_obj.test_condition} at {drt_obj.current_soc.split("_")[0]}'
+                        ax1.scatter(drt_obj.df.Real, -drt_obj.df.Imag,
+                                    label=lbl,
+                                    s=6,
+                                    color=style.color,
+                                    marker=style.marker)
+                        ax1.axhline(0, color='black', linestyle='dotted', linewidth=1)
+
+        # Shrink both axes to make space for the legend
+        box1 = ax1.get_position()
+        ax1.set_position([box1.x0, box1.y0, box1.width * 0.55, box1.height])
+        ax1.set_xlabel(r'Re(Z) [$\unit{\ohm}$]', fontsize=label_fnt_sz)
+        ax1.set_ylabel(r'-Im(Z) [$\unit{\ohm}$]', fontsize=label_fnt_sz)
+        ymax = ax1.get_ylim()[1]  # Get current upper y-limit
+        ax1.set_ylim(-0.005, ymax)
+
+        box2 = ax2.get_position()
+        ax2.set_position([box2.x0, box2.y0, box2.width * 0.55, box2.height])
+        ax2.yaxis.label.set_fontsize(label_fnt_sz)
+        ax2.xaxis.label.set_fontsize(label_fnt_sz)
+        # Combine legends from both plots
+        handles1, labels1 = ax1.get_legend_handles_labels()
+        handles2, labels2 = ax2.get_legend_handles_labels()
+
+        # Create a single legend for both plots outside on the right
+        fig.legend(handles1 + handles2, labels1 + labels2, loc='center left', bbox_to_anchor=(0.58, 0.5), fontsize=11.5)
+        fname = f'EIS_and_DRT_for_cells_{"_".join([str(c) for c in cells_to_plot])}_and_{soc_fltr}.png'
+        fig.savefig(os.path.join(output_dir, fname), dpi=400)
