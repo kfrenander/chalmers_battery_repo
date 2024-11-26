@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
-from test_data_analysis.BasePecDataClass import BasePecRpt, find_step_characteristics
+from test_data_analysis.BasePecDataClass import BasePecRpt, find_step_characteristics_fast
 from test_data_analysis.pec_lifetest import PecLifeTestData
+from test_data_analysis.ici_analysis_class import ICIAnalysis
 import os
 
 
@@ -26,9 +27,11 @@ class PecSmartCellData(PecLifeTestData):
             if not os.path.isdir(self.op_folder):
                 os.makedirs(self.op_folder)
             self.dyn_data.to_pickle(os.path.join(self.op_folder, 'full_data.pkl'))
-            for k, df in self.ici_dict.items():
-                f_name = f'ici_from_rpt_{k:.0f}.pkl'
-                df.to_pickle(os.path.join(self.op_folder, f_name))
+            for k, ici_obj in self.ici_dict.items():
+                f_name_raw = f'raw_ici_from_rpt_{k:.0f}.pkl'
+                ici_obj.raw_data.to_pickle(os.path.join(self.op_folder, f_name_raw))
+                f_name_res = f'processed_ici_from_rpt_{k:.0f}.pkl'
+                ici_obj.ici_result_df.to_pickle(os.path.join(self.op_folder, f_name_res))
             for k, dct in self.rpt_dict.items():
                 for nbr, df in dct.items():
                     f_name_rpt = f'rpt_{nbr:.0f}_{k}_raw.pkl'
@@ -72,14 +75,14 @@ class PecSmartCellRpt(BasePecRpt):
         self._make_rpt_summary()
 
     def fast_rpt_analysis(self, df):
-        stp_info = find_step_characteristics(df)
+        stp_info = find_step_characteristics_fast(df)
         FCE = self.find_fce(df)
         date, q_mean, q_err = self.find_capacity_measurement(stp_info)
         rpt_df = pd.DataFrame(data=[date, FCE, q_mean, q_err], index=['date', 'fce', 'cap', 'sig_cap']).T
         return rpt_df
 
     def comp_rpt_analysis(self, df):
-        stp_info = find_step_characteristics(df)
+        stp_info = find_step_characteristics_fast(df)
         date, q_mean, q_err = self.find_capacity_measurement(stp_info)
         FCE = self.find_fce(df)
         res_df = self.find_resistance_vals(df, stp_info)
@@ -157,5 +160,6 @@ if __name__ == '__main__':
     import os
     BASE_PATH = get_base_path_batt_lab_data()
     test_file_path = r"smart_cell_JG\TestBatch2_autumn2023\Test2498_Cell-1.csv"
-    test_file = os.path.join(BASE_PATH, test_file_path)
+    # test_file = os.path.join(BASE_PATH, test_file_path)
+    test_file = r"D:\PEC_logs\Test2767_Cell-1.csv"
     class_test = PecSmartCellData(test_file, op_bool=1)
