@@ -2,9 +2,8 @@ import pandas as pd
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 from test_data_analysis.BasePecDataClass import find_step_characteristics_fast
-from test_data_analysis.rpt_analysis import characterise_steps
+from test_data_analysis.rpt_analysis import characterise_steps_agg
 import matplotlib.pyplot as plt
-from numba import njit
 
 
 def fit_lin_vs_sqrt_time(df, col):
@@ -30,17 +29,19 @@ class ICIAnalysis:
         - input_data: str (path to pickle) or pd.DataFrame (direct dataframe)
         """
         self.settings = None
+        self.ica_df = None
+        self.ici_result_df = None
         self.rest_dict = {}
         self.chrg_dict = {}
         self.dchg_dict = {}
         if isinstance(input_data, str):
-            self.ici_df = pd.read_pickle(input_data)
+            self.raw_data = pd.read_pickle(input_data)
         elif isinstance(input_data, pd.DataFrame):
-            self.ici_df = input_data
+            self.raw_data = input_data
         else:
             raise ValueError("Input data must be either a string (file path) or a pandas DataFrame")
         self.settings = self.initialise_settings()
-        self.ch_df = self.settings['characterize_fun'](self.ici_df)
+        self.ch_df = self.settings['characterize_fun'](self.raw_data)
         self.split_df_to_dicts()
 
     def initialise_settings(self):
@@ -70,7 +71,7 @@ class ICIAnalysis:
             settings = self.initialise_settings()
             print(settings['mode_column'])  # Outputs 'instruction' or 'mode'
         """
-        if 'instruction' in self.ici_df.columns:
+        if 'instruction' in self.raw_data.columns:
             return {
                 'mode_column': 'instruction',  # Default is 'mode', can be overridden to 'instruction'
                 'charge_instructions': 'I Charge',
@@ -81,7 +82,7 @@ class ICIAnalysis:
                 'step_counter': 'unq_step',
                 'characterize_fun': find_step_characteristics_fast
             }
-        elif 'mode' in self.ici_df.columns:
+        elif 'mode' in self.raw_data.columns:
             return {
                 'mode_column': 'mode',  # Default is 'mode', can be overridden to 'instruction'
                 'charge_instructions': 'CC Chg',  # Default charge instruction for 'mode'
@@ -90,7 +91,7 @@ class ICIAnalysis:
                 'dchg_indicator': 'CC DChg',
                 'rest_instructions': 'Rest',
                 'step_counter': 'arb_step2',
-                'characterize_fun': characterise_steps
+                'characterize_fun': characterise_steps_agg
             }
 
     def categorize_step(self):
@@ -149,7 +150,7 @@ class ICIAnalysis:
         return self.ch_df
 
     def check_ici_step(self, step):
-        stp_df = self.ici_df[self.ici_df.step == step]
+        stp_df = self.raw_data[self.raw_data.step == step]
         mean_curr = stp_df.curr.mean()
         first_curr = stp_df.loc[stp_df.first_valid_index(), 'curr']
         last_curr = stp_df.loc[stp_df.last_valid_index(), 'curr']
@@ -161,18 +162,18 @@ class ICIAnalysis:
 
     def calc_step_res(self):
         dchg_curr = 1
-        for st in self.ici_df.step.unique():
+        for st in self.raw_data.step.unique():
             if st > 1:
-                beg_ind = self.ici_df[self.ici_df.step == st].first_valid_index()
-                stp_ind = self.ici_df[self.ici_df.step == st].last_valid_index()
-                stp_curr = self.ici_df[self.ici_df.step == st]['curr'].mean()
+                beg_ind = self.raw_data[self.raw_data.step == st].first_valid_index()
+                stp_ind = self.raw_data[self.raw_data.step == st].last_valid_index()
+                stp_curr = self.raw_data[self.raw_data.step == st]['curr'].mean()
                 if stp_curr != 0:
                     dchg_curr = stp_curr
-                    fin_volt = self.ici_df.loc[stp_ind, 'volt']
+                    fin_volt = self.raw_data.loc[stp_ind, 'volt']
                 elif stp_curr == 0 and self.check_ici_step(st - 1):
-                    self.ici_df.loc[beg_ind, 'R0'] = 1e3 * (fin_volt - self.ici_df.loc[beg_ind, 'volt']) / dchg_curr
-                    self.ici_df.loc[stp_ind, 'R10'] = 1e3 * (fin_volt - self.ici_df.loc[stp_ind, 'volt']) / dchg_curr
-        return self.ici_df
+                    self.raw_data.loc[beg_ind, 'R0'] = 1e3 * (fin_volt - self.raw_data.loc[beg_ind, 'volt']) / dchg_curr
+                    self.raw_data.loc[stp_ind, 'R10'] = 1e3 * (fin_volt - self.raw_data.loc[stp_ind, 'volt']) / dchg_curr
+        return self.raw_data
 
     def split_df_to_dicts(self):
         # Map step_mode to the respective dictionary
@@ -183,21 +184,21 @@ class ICIAnalysis:
         for step_mode, group in self.ch_df.groupby('step_mode'):
             for step in group['step_nbr']:
                 # Filter rows in df corresponding to the current step
-                step_df = self.ici_df[self.ici_df[self.settings['step_counter']] == step]
+                step_df = self.raw_data[self.raw_data[self.settings['step_counter']] == step]
                 # Add the dataframe to the corresponding step_mode dictionary
                 step_mode_dict[step_mode][step] = step_df
 
     def extract_ica_from_ici(self, col='volt'):
         v_flt = 5e-3
-        if self.settings['mode_column'] in self.ici_df.columns:
+        if self.settings['mode_column'] in self.raw_data.columns:
             mode_column = self.settings['mode_column']
             mode_mapping = {
-                'chrg': {'first_index': self.ici_df[
-                    self.ici_df[mode_column] == self.settings['charge_instructions']].first_valid_index(),
+                'chrg': {'first_index': self.raw_data[
+                    self.raw_data[mode_column] == self.settings['charge_instructions']].first_valid_index(),
                                                'volt_mark': 0,
                                                'mAh_factor': 1},
-                'dchg': {'first_index': self.ici_df[
-                    self.ici_df[mode_column] == self.settings['discharge_instructions']].first_valid_index(),
+                'dchg': {'first_index': self.raw_data[
+                    self.raw_data[mode_column] == self.settings['discharge_instructions']].first_valid_index(),
                                                   'volt_mark': 5,
                                                   'mAh_factor': -1}
             }
@@ -208,11 +209,11 @@ class ICIAnalysis:
         dchg_first_idx = mode_mapping['dchg']['first_index']
 
         if chrg_first_idx < dchg_first_idx:
-            df_chrg = self.ici_df.loc[:dchg_first_idx - 1]
-            df_dchg = self.ici_df.loc[dchg_first_idx:]
+            df_chrg = self.raw_data.loc[:dchg_first_idx - 1]
+            df_dchg = self.raw_data.loc[dchg_first_idx:]
         else:
-            df_chrg = self.ici_df.loc[chrg_first_idx:]
-            df_dchg = self.ici_df.loc[:chrg_first_idx - 1]
+            df_chrg = self.raw_data.loc[chrg_first_idx:]
+            df_dchg = self.raw_data.loc[:chrg_first_idx - 1]
 
         # Process charge and discharge dataframes
         dfs = {}
@@ -221,7 +222,7 @@ class ICIAnalysis:
             indices = (df_chrg if mode == 'chrg' else df_dchg).index.values
             idx_to_keep = self.filter_indices_positive(voltages, indices, mode, v_flt)
 
-            ica_df = self.ici_df.loc[idx_to_keep, :].copy()
+            ica_df = self.raw_data.loc[idx_to_keep, :].copy()
 
             # Compute the gradient for 'ica_raw' and apply Gaussian filtering
             ica_df['ica_raw'] = np.gradient(mode_mapping[mode]['mAh_factor'] * ica_df['mAh'], ica_df['volt'])
@@ -245,17 +246,44 @@ class ICIAnalysis:
 
         return np.array(idx_to_retain)
 
+    def store_linear_fit(self, step_id=None):
+        if step_id:
+            self.check_linear_fit(self.rest_dict[step_id])
+        else:
+            for k, df in self.rest_dict.items():
+                self.check_linear_fit(df)
+
+    def check_linear_fit(self, df):
+        df.loc[:, 'sqrt_fit'] = np.polyval(fit_lin_vs_sqrt_time(df, col='volt'),
+                                           np.sqrt(df['float_step_time']))
+
+    def plot_linear_fit(self, step_id=None, fig=None, ax=None):
+        if fig is None and ax is None:
+            fig, ax = plt.subplots(1, 1)
+        if step_id:
+            self.store_linear_fit(step_id)
+            df = self.rest_dict[step_id]
+            ax.plot(np.sqrt(df.float_step_time), df.sqrt_fit, linestyle='dashed')
+            ax.plot(np.sqrt(df.float_step_time), df.volt)
+        else:
+            self.store_linear_fit()
+            for k, df in self.rest_dict.items():
+                ax.plot(np.sqrt(df.float_step_time), df.sqrt_fit, linestyle='dashed')
+                ax.plot(np.sqrt(df.float_step_time), df.volt)
+        return fig, ax
+
     def perform_ici_analysis(self):
         # Perform ICI analysis
-        ica_df = self.extract_ica_from_ici(col='volt')
+        self.ica_df = self.extract_ica_from_ici(col='volt')
         # proc_df = self.categorize_step()
-        proc_df = self.find_ici_parameters()
-        return proc_df, ica_df
+        self.ici_result_df = self.find_ici_parameters()
+        return self.ici_result_df, self.ica_df
 
 
 if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
     import os
+    pd.options.mode.chained_assignment = None
     plt.style.use(['widthsixinches', 'ml_colors', 'noframe'])
     plt.rcParams.update({
         "text.usetex": True,
@@ -280,3 +308,6 @@ if __name__ == '__main__':
         plt.legend()
         plt.xlabel('Voltage [V]')
         plt.ylabel(r'Diffusive resistance [$\unit{\milli\ohm\per\sqrt\second}$]')
+    fig, ax = neware_ici_analysis.plot_linear_fit()
+    ax.set_xlabel(r'Square root time [\unit{\sqrt\second}]')
+    ax.set_ylabel(r'Voltage [\unit{\volt}]')
