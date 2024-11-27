@@ -1,8 +1,6 @@
 import pandas as pd
-import numpy as np
 from test_data_analysis.BasePecDataClass import BasePecRpt, find_step_characteristics_fast
 from test_data_analysis.pec_lifetest import PecLifeTestData
-from test_data_analysis.ici_analysis_class import ICIAnalysis
 import os
 
 
@@ -12,7 +10,7 @@ class PecSmartCellData(PecLifeTestData):
         super().__init__(fname)
         self.op_folder = ''
         self.write_output = op_bool
-        self.test_name = self.lookup_test_()
+        self.test_name = self.meta_data_dict['TestRegime Name']
         self.rpt_obj = PecSmartCellRpt(self.rpt_dict)
         self.set_op_dir()
         self.write_files()
@@ -37,9 +35,13 @@ class PecSmartCellData(PecLifeTestData):
                     f_name_rpt = f'rpt_{nbr:.0f}_{k}_raw.pkl'
                     df.to_pickle(os.path.join(self.op_folder, f_name_rpt))
             self.rpt_obj._output_rpt_summary(os.path.join(self.op_folder, 'rpt_summary'))
+            metadata_fname = f'metadata_test{self.test_nbr}_cell{self.cell_nbr}.txt'
+            with open(os.path.join(self.op_folder, metadata_fname), 'w') as f:
+                for key, value in self.formatted_metadata:
+                    f.write(f"{key}: {value}\n")
         return None
 
-    def lookup_test_(self):
+    def lookup_test(self):
         test_name_dict = {
             'Test2441': 'FaultTrace',
             'Test2443': 'FaultTrace',
@@ -157,7 +159,6 @@ class PecSmartCellRpt(BasePecRpt):
 
 if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
-    import os
     BASE_PATH = get_base_path_batt_lab_data()
     test_file_path = r"smart_cell_JG\TestBatch2_autumn2023\Test2498_Cell-1.csv"
     # test_file = os.path.join(BASE_PATH, test_file_path)

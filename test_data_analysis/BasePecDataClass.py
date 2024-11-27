@@ -71,23 +71,24 @@ def find_step_characteristics_fast(df):
 class BasePecData(object):
 
     def __init__(self, fname, data_init_row=24):
-        self.rpt_dict = {}
-        self.ici_dict = {}
         self.meta_data_dict = {}
         self.data_file = fname
         self.data_init_row = data_init_row
+        self.meta_data_dict = self.read_pec_metadata()
         self.test_nbr = self.find_test_nbr()
+        self.cell_nbr = self.find_cell_nbr()
         self.col_name_dict = self.make_rename_column_dict()
         self.dyn_data = self.read_pec_file(fname)
-        self.meta_data_dict = self.read_pec_metadata()
         self.dyn_data = self.fill_step_cap_fast()
         self.dyn_data = self.fill_step_egy_fast()
         self.step_info = find_step_characteristics_fast(self.dyn_data)
-        # self.find_all_rpt()
-        # self.find_ici()
 
     def find_test_nbr(self):
-        return re.search(r'Test\d+', self.data_file).group()
+        return self.meta_data_dict['Test']
+
+    def find_cell_nbr(self):
+        cell_nbr_raw = self.meta_data_dict['Split Results'][-1]
+        return re.search('\d+', cell_nbr_raw).group()
 
     def make_rename_column_dict(self):
         orig_name_list = ['Step',
@@ -145,13 +146,12 @@ class BasePecData(object):
         from test_data_analysis.read_pec_file import find_data_init_row
         try:
             raw_df = pd.read_csv(fname, skiprows=self.data_init_row)
-            raw_df.columns = [self.col_name_dict[c] for c in raw_df.columns]
         except (pd.errors.ParserError, KeyError):
             self.data_init_row = find_data_init_row(fname)
             print(f'Error detected for default initrow \nRe-initiating initrow to {self.data_init_row}.')
             raw_df = pd.read_csv(fname, skiprows=self.data_init_row)
             # raw_df.columns = [self.col_name_dict[c] for c in raw_df.columns]
-            raw_df.rename(self.col_name_dict, axis=1, inplace=True)
+        raw_df.rename(self.col_name_dict, axis=1, inplace=True)
         raw_df['abs_time'] = pd.to_datetime(raw_df.abs_time)
         raw_df.loc[:, 'mAh'] = cumtrapz(raw_df.curr, raw_df.float_time, initial=0) / 3600
         nbr_of_unique_steps = raw_df[raw_df.step.diff() != 0].shape[0]
@@ -165,7 +165,10 @@ class BasePecData(object):
             for cnt, line in enumerate(f):
                 if cnt < self.data_init_row:
                     ln_ = line.split(',')
-                    tmp_dct[ln_[0].strip()] = [ln.strip() for ln in ln_[1:]]
+                    if len(ln_) != 2:
+                        tmp_dct[ln_[0].strip().strip(':')] = [ln.strip() for ln in ln_[1:]]
+                    else:
+                        tmp_dct[ln_[0].strip().strip(':')] = ln_[1].strip()
                 else:
                     f.close()
                     break
@@ -230,13 +233,13 @@ class BasePecRpt(object):
     def __init__(self, data_dict):
         self.data_dict = data_dict
         self.step_info_dict = {}
-        self._step_info()
+        # self._step_info()
 
     def _step_info(self):
         tmp_dct = {}
         for k, dct in self.data_dict.items():
             for j, df in dct.items():
-                tmp_dct[f'{k}_{j}'] = find_step_characteristics(df)
+                tmp_dct[f'{k}_{j}'] = find_step_characteristics_fast(df)
         self.step_info_dict = tmp_dct
         return None
 
