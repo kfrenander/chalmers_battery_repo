@@ -1,23 +1,106 @@
 import pandas as pd
+import numpy as np
+from scipy.optimize import curve_fit
 from test_data_analysis.BasePecDataClass import BasePecRpt, find_step_characteristics_fast
 from test_data_analysis.pec_lifetest import PecLifeTestData
 import os
+import re
+
+
+class TestCaseStyler:
+    def __init__(self):
+        self.test_case_styles = {
+            '10Hz 25duty pulse': {'color': '#1f77b4', 'marker': 'o', 'linestyle': '--', 'label': '10Hz 25% Duty Pulse'},
+            '10Hz 50 duty pulse': {'color': '#ff7f0e', 'marker': 's', 'linestyle': '--', 'label': '10Hz 50% Duty Pulse'},
+            '125Hz 25duty pulse': {'color': '#2ca02c', 'marker': '^', 'linestyle': '-.', 'label': '125Hz 25% Duty Pulse'},
+            '1C reference': {'color': '#d62728', 'marker': 'x', 'linestyle': '-', 'label': '1C Reference'},
+            '1Hz 25duty pulse': {'color': '#9467bd', 'marker': '.', 'linestyle': ':', 'label': '1Hz 25% Duty Pulse'},
+            '1Hz 50 duty pulse': {'color': '#8c564b', 'marker': '8', 'linestyle': ':', 'label': '1Hz 50% Duty Pulse'},
+            '50Hz 25duty pulse': {'color': '#e377c2', 'marker': 'v', 'linestyle': '-.', 'label': '50Hz 25% Duty Pulse'},
+            '50Hz 50 duty pulse': {'color': '#7f7f7f', 'marker': '+', 'linestyle': '-.', 'label': '50Hz 50% Duty Pulse'},
+        }
+
+    def get_style(self, case_name):
+        """
+        Returns the style dictionary for the given test case name.
+        If the case is not found, returns a default style.
+        """
+        return self.test_case_styles.get(case_name, {
+            'color': 'gray',
+            'marker': '.',
+            'linestyle': '-',
+            'label': case_name,
+        })
 
 
 class PecSmartCellData(PecLifeTestData):
 
-    def __init__(self, fname, op_bool=0):
-        super().__init__(fname)
+    def __init__(self, filename, op_bool=0):
+        super().__init__(filename)
         self.op_folder = ''
         self.write_output = op_bool
         self.test_name = self.meta_data_dict['TestRegime Name']
         self.rpt_obj = PecSmartCellRpt(self.rpt_dict)
         self.set_op_dir()
         self.write_files()
+        self.line_styler = TestCaseStyler()
+        self.style = self.line_styler.get_style(self.formatted_metadata['OUTPUT_NAME'])
+        self.popt = None
+        self.pcov = None
+
+    def _q_function(self, fce, q0, tau, beta):
+        """The function to fit: Q(fce) = q0 * exp(-(fce/tau)^beta)"""
+        fce = np.asarray(fce)
+        return q0 * np.exp(-(fce / tau) ** beta)
+
+    def fit_degradation_function(self):
+        """
+            Fit the Q(fce) function to data.
+            Args:
+               fce (array-like): FCE data
+               q (array-like): Capacity data
+            Returns:
+               popt (tuple): Optimized parameters (q0, tau, beta)
+               pcov (2D array): Covariance matrix of the fit
+        """
+        x_data = self.rpt_obj.rpt_summary.fce.astype('float')
+        y_data = self.rpt_obj.rpt_summary.cap_normalised.astype('float')
+        popt, pcov = curve_fit(self._q_function, x_data, y_data, p0=[1, 100, 1])
+        self.popt = popt
+        self.pcov = pcov
+        return popt, pcov
+
+    def find_fce_at_given_q(self, q_target):
+        """
+        Find the time at which the fitted Q(t) function yields a given Q.
+        Args:
+            q_target (float): Target capacity
+        Returns:
+            t (float): Time corresponding to the target Q
+        """
+        if self.popt is None:
+            raise ValueError("You must fit the function before calling this method.")
+
+        # Solve for t such that Q(t) = q_target
+        from scipy.optimize import root_scalar
+
+        def equation(fce):
+            return q_target - self._q_function(fce, *self.popt)
+
+        result = root_scalar(equation, bracket=[1e-5, 1e5], method='brentq')
+        if result.converged:
+            return result.root
+        else:
+            raise RuntimeError("Failed to converge to a solution.")
 
     def set_op_dir(self):
         dir_name, fname = os.path.split(self.data_file)
-        self.op_folder = os.path.join(dir_name, f'pickle_files_{fname.split("_")[0]}')
+        if self.formatted_metadata:
+            op_name = (f'pickle_files_{self.formatted_metadata["OUTPUT_NAME"].replace(" ", "_")}_'
+                       f'cell_{self.formatted_metadata["CELL_ID"]}')
+            self.op_folder = os.path.join(dir_name, op_name)
+        else:
+            self.op_folder = os.path.join(dir_name, f'pickle_files_{fname.split(".")[0].replace("-","_")}')
         return None
 
     def write_files(self):
@@ -37,7 +120,7 @@ class PecSmartCellData(PecLifeTestData):
             self.rpt_obj._output_rpt_summary(os.path.join(self.op_folder, 'rpt_summary'))
             metadata_fname = f'metadata_test{self.test_nbr}_cell{self.cell_nbr}.txt'
             with open(os.path.join(self.op_folder, metadata_fname), 'w') as f:
-                for key, value in self.formatted_metadata:
+                for key, value in self.formatted_metadata.items():
                     f.write(f"{key}: {value}\n")
         return None
 
@@ -63,6 +146,33 @@ class PecSmartCellData(PecLifeTestData):
         except KeyError:
             print(f'Key{self.test_nbr} not found. Return default.')
             return 'Default_unknown_test'
+
+    def filter_ici_on_cap(self, cap_vals):
+        rpt_df = self.rpt_obj.rpt_summary.dropna(subset='R0_dchg-soc_70')
+        filtered_ici = []
+        for value in cap_vals:
+            # Find the absolute difference between the value and the column
+            diffs = np.abs(rpt_df['cap_normalised'] - value).astype(float)
+            # Find the index of the minimum difference
+            closest_idx = diffs.idxmin()
+            # Append the identified ICI
+            filtered_ici.append(self.ici_dict[closest_idx])
+        return list(set(filtered_ici))
+
+    def _complement_metadata(self):
+        pattern = r'(?P<Duty>\d+(\.\d+)?)duty (?P<C_rate>\d+(\.\d+)?)C (?P<Frequency>\d+(\.\d+)?)Hz'
+
+        # Using re.search to find the matches
+        match = re.search(pattern, self.formatted_metadata['TEST_CONDITION'])
+
+        if match:
+            self.formatted_metadata.update(match.groupdict())
+        else:
+            self.formatted_metadata.update({
+                'Duty': 100,
+                'C_rate': 1,
+                'Frequency': 0
+            })
 
 
 class PecSmartCellRpt(BasePecRpt):
@@ -111,7 +221,7 @@ class PecSmartCellRpt(BasePecRpt):
         from scipy.interpolate import interp1d
         pulse_steps = stp_info[(stp_info.duration < 11) & (stp_info.curr.abs() > 5)].step_nbr
         soc_arr = [30, 30, 50, 50, 70, 70]
-        volt_lvl = [2.8, 3.5, 3.55, 3.7, 3.75, 4.2]
+        volt_lvl = [2.8, 3.65, 3.66, 3.84, 3.85, 4.2]
         soc_lookup = interp1d(volt_lvl, soc_arr, kind='previous')
         R0_dchg = {}
         R0_chrg = {}
@@ -119,14 +229,16 @@ class PecSmartCellRpt(BasePecRpt):
         R10_chrg = {}
         for stp in pulse_steps:
             ocv = df.loc[df[df.unq_step == stp - 1].last_valid_index(), 'volt']
-            print('Found ocv of {:.2f}'.format(ocv))
+            # print('Found ocv of {:.2f}'.format(ocv))
             round_soc = soc_lookup(ocv)
-            print(f'Found rounded soc of {round_soc}')
             step_label = f'soc_{round_soc:.0f}'
-            curr = df[df.unq_step== stp].curr.mean()
+            curr = df[df.unq_step == stp].curr.mean()
             start_index_pulse = df[df.unq_step == stp].first_valid_index()
             fin_index_pulse = df[df.unq_step == stp].last_valid_index()
-            R10 = (df.loc[fin_index_pulse, 'volt'] - ocv) / curr
+            if abs(stp_info.loc[stp, 'duration'] - 10) > 0.5:
+                R10 = None
+            else:
+                R10 = (df.loc[fin_index_pulse, 'volt'] - ocv) / curr
             R0 = (df.loc[start_index_pulse, 'volt'] - ocv) / curr
             if curr > 0:
                 R0_chrg[step_label] = R0
@@ -139,8 +251,16 @@ class PecSmartCellRpt(BasePecRpt):
         return op
 
     def _make_rpt_summary(self):
-        df_fast = pd.concat(self.fast_rpt_dict.values())
-        df_comp = pd.concat(self.comp_rpt_dict.values())
+        try:
+            df_fast = pd.concat(self.fast_rpt_dict.values())
+        except ValueError as e:
+            print(f'Not possible to concatenate empty dict. Return empty df instead.')
+            df_fast = pd.DataFrame()
+        try:
+            df_comp = pd.concat(self.comp_rpt_dict.values())
+        except ValueError as e:
+            print(f'Not possible to concatenate empty dict. Return empty df instead.')
+            df_comp = pd.DataFrame()
         rpt_summary = pd.concat([df_comp, df_fast]).sort_values(by='fce')
         rpt_summary.reset_index(drop=True, inplace=True)
         for c in rpt_summary.columns:
@@ -156,11 +276,27 @@ class PecSmartCellRpt(BasePecRpt):
         self.rpt_summary.to_excel(f'{fpath}.xlsx', index=False)
         self.rpt_summary.to_pickle(f'{fpath}.pkl')
 
+    def __call__(self, t):
+        """
+        Make the fitted function callable, using the fitted parameters.
+        Args:
+            t (array-like): Time data
+        Returns:
+            Q (array-like): Fitted capacity values
+        """
+        if self.popt is None:
+            raise ValueError("You must fit the function before calling it.")
+        q0, tau, beta = self.popt
+        return self._q_function(t, q0, tau, beta)
+
 
 if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
     BASE_PATH = get_base_path_batt_lab_data()
-    test_file_path = r"smart_cell_JG\TestBatch2_autumn2023\Test2498_Cell-1.csv"
-    # test_file = os.path.join(BASE_PATH, test_file_path)
-    test_file = r"D:\PEC_logs\Test2767_Cell-1.csv"
-    class_test = PecSmartCellData(test_file, op_bool=1)
+    test_file_path = r"pulse_chrg_test\high_frequency_testing\PEC_export\Test2818_Cell-1.csv"
+    test_file = os.path.join(BASE_PATH, test_file_path)
+    # test_file = r"D:\PEC_logs\Test2767_Cell-1.csv"
+    class_test = PecSmartCellData(test_file, op_bool=0)
+    df = class_test.rpt_obj.rpt_summary
+    class_test.fit_degradation_function()
+    filtered_ici = class_test.filter_ici_on_cap(np.arange(1, 0.8, -0.1))
