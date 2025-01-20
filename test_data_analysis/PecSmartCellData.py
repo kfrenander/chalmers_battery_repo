@@ -10,14 +10,14 @@ import re
 class TestCaseStyler:
     def __init__(self):
         self.test_case_styles = {
-            '10Hz 25duty pulse': {'color': '#1f77b4', 'marker': 'o', 'linestyle': '--', 'label': '10Hz 25% Duty Pulse'},
-            '10Hz 50 duty pulse': {'color': '#ff7f0e', 'marker': 's', 'linestyle': '--', 'label': '10Hz 50% Duty Pulse'},
-            '125Hz 25duty pulse': {'color': '#2ca02c', 'marker': '^', 'linestyle': '-.', 'label': '125Hz 25% Duty Pulse'},
+            '10 Hz 25 duty cycle pulse': {'color': '#1f77b4', 'marker': 'o', 'linestyle': '--', 'label': '10Hz 25% Duty Pulse'},
+            '10 Hz 50 duty cycle pulse': {'color': '#ff7f0e', 'marker': 's', 'linestyle': '--', 'label': '10Hz 50% Duty Pulse'},
+            '125 Hz 25 duty cycle pulse': {'color': '#2ca02c', 'marker': '^', 'linestyle': '-.', 'label': '125Hz 25% Duty Pulse'},
             '1C reference': {'color': '#d62728', 'marker': 'x', 'linestyle': '-', 'label': '1C Reference'},
-            '1Hz 25duty pulse': {'color': '#9467bd', 'marker': '.', 'linestyle': ':', 'label': '1Hz 25% Duty Pulse'},
-            '1Hz 50 duty pulse': {'color': '#8c564b', 'marker': '8', 'linestyle': ':', 'label': '1Hz 50% Duty Pulse'},
-            '50Hz 25duty pulse': {'color': '#e377c2', 'marker': 'v', 'linestyle': '-.', 'label': '50Hz 25% Duty Pulse'},
-            '50Hz 50 duty pulse': {'color': '#7f7f7f', 'marker': '+', 'linestyle': '-.', 'label': '50Hz 50% Duty Pulse'},
+            '1 Hz 25 duty cycle pulse': {'color': '#9467bd', 'marker': '.', 'linestyle': ':', 'label': '1Hz 25% Duty Pulse'},
+            '1 Hz 50 duty cycle pulse': {'color': '#8c564b', 'marker': '8', 'linestyle': ':', 'label': '1Hz 50% Duty Pulse'},
+            '50 Hz 25 duty cycle pulse': {'color': '#e377c2', 'marker': 'v', 'linestyle': '-.', 'label': '50Hz 25% Duty Pulse'},
+            '50 Hz 50 duty cycle pulse': {'color': '#7f7f7f', 'marker': '+', 'linestyle': '-.', 'label': '50Hz 50% Duty Pulse'},
         }
 
     def get_style(self, case_name):
@@ -47,6 +47,7 @@ class PecSmartCellData(PecLifeTestData):
         self.style = self.line_styler.get_style(self.formatted_metadata['OUTPUT_NAME'])
         self.popt = None
         self.pcov = None
+        self._complement_metadata()
 
     def _q_function(self, fce, q0, tau, beta):
         """The function to fit: Q(fce) = q0 * exp(-(fce/tau)^beta)"""
@@ -149,15 +150,19 @@ class PecSmartCellData(PecLifeTestData):
 
     def filter_ici_on_cap(self, cap_vals):
         rpt_df = self.rpt_obj.rpt_summary.dropna(subset='R0_dchg-soc_70')
-        filtered_ici = []
+        filtered_ici = {}
         for value in cap_vals:
             # Find the absolute difference between the value and the column
             diffs = np.abs(rpt_df['cap_normalised'] - value).astype(float)
             # Find the index of the minimum difference
             closest_idx = diffs.idxmin()
             # Append the identified ICI
-            filtered_ici.append(self.ici_dict[closest_idx])
-        return list(set(filtered_ici))
+            if self.ici_dict[closest_idx].ici_result_df.maxV.max() > 4:
+                filtered_ici[closest_idx] = self.ici_dict[closest_idx]
+            else:
+                closest_idx = diffs.nsmallest(n=2).index[-1]
+                filtered_ici[closest_idx] = self.ici_dict[closest_idx]
+        return filtered_ici
 
     def _complement_metadata(self):
         pattern = r'(?P<Duty>\d+(\.\d+)?)duty (?P<C_rate>\d+(\.\d+)?)C (?P<Frequency>\d+(\.\d+)?)Hz'
