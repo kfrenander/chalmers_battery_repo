@@ -1,0 +1,15 @@
+figure.figsize: 6, 4.5  # 6inch width, adjust height
+font.size: 11  # Small font size for smaller figure
+axes.labelsize: 14  # Axis labels
+xtick.labelsize: 11  # Tick labels
+ytick.labelsize: 11
+legend.fontsize: 9.5  # Legend font size
+lines.linewidth: 1  # Line width
+lines.markersize: 3.5  # Marker size
+savefig.dpi: 300  # High quality output
+figure.autolayout: True  # Automatically adjust layout to prevent clipping
+
+axes.grid: True  # Turn on grid for axes
+grid.linestyle: --  # Optional: Set grid style (e.g., dashed lines)
+grid.alpha: 0.7  # Optional: Set transparency for the grid
+

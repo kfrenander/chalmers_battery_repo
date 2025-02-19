@@ -1,0 +1,38 @@
+# Figure size in inches (adjust width and height to suit A0 two-column layout)
+figure.figsize: 16, 9  # Wide format (16:9 aspect ratio)
+
+# Font sizes for readability on a large poster
+font.size: 22  # Base font size
+axes.labelsize: 26  # Axis label size
+xtick.labelsize: 21  # X-tick label size
+ytick.labelsize: 21  # Y-tick label size
+legend.fontsize: 21  # Legend font size
+axes.titlesize: 26  # Title size
+font.family: Times New Roman
+
+# Line width and marker size for clearer visual elements
+lines.linewidth: 2.5  # Thicker lines
+lines.markersize: 10  # Larger markers
+
+# Grid settings
+axes.grid: True  # Turn on grid
+grid.linestyle: --  # Dashed grid lines
+grid.alpha: 0.5  # Semi-transparent grid
+
+# Ticks
+xtick.major.size: 8  # Major tick size
+xtick.minor.size: 4  # Minor tick size
+ytick.major.size: 8
+ytick.minor.size: 4
+
+# Legend settings
+legend.loc: best  # Automatically place legend in the best location
+legend.frameon: True  # Turn on legend frame
+legend.framealpha: 0.9  # Make legend frame slightly transparent
+
+# Save figure settings (higher DPI for posters)
+savefig.dpi: 350  # High quality
+savefig.format: svg  # Save as PDF for scalable output
+
+# Automatically adjust layout to prevent label clipping
+figure.autolayout: True

@@ -1,0 +1,15 @@
+# Adjusted for 8-inch width with a 4:3 aspect ratio
+figure.figsize: 8, 6  # 8 inches wide, 4:3 aspect ratio
+font.size: 13  # Slightly larger font size for larger figure
+axes.labelsize: 16  # Axis labels
+xtick.labelsize: 13  # Tick labels
+ytick.labelsize: 13
+legend.fontsize: 10.5  # Legend font size
+lines.linewidth: 1.2  # Slightly thicker line width for visibility
+lines.markersize: 7  # Slightly larger marker size
+savefig.dpi: 300  # High-quality output
+figure.autolayout: True  # Automatically adjust layout to prevent clipping
+
+axes.grid: True  # Turn on grid for axes
+grid.linestyle: --  # Optional: Set grid style (e.g., dashed lines)
+grid.alpha: 0.7  # Optional: Set transparency for the grid
