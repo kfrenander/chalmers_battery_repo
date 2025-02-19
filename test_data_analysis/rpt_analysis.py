@@ -46,8 +46,8 @@ def find_step_characteristics(df):
     return df_out
 
 
-def characterise_steps(df):
-    gb = df.groupby('arb_step2')
+def characterise_steps(df, step_counter='arb_step2', mode_indicator='mode'):
+    gb = df.groupby(step_counter)
     attr = {k: [gb.get_group(k)['abs_time'].iloc[0],
                 gb.get_group(k).volt.max(),
                 gb.get_group(k).volt.min(),
@@ -57,7 +57,7 @@ def characterise_steps(df):
                 gb.get_group(k).egy_chrg.max(),
                 gb.get_group(k).cap.abs().max(),
                 gb.get_group(k).step_time.max().total_seconds(),
-                gb.get_group(k)['mode'].mode().values[0],
+                gb.get_group(k)[mode_indicator].mode().values[0],
                 k]
             for k in gb.groups}
     df_out = pd.DataFrame.from_dict(attr, orient='index',
@@ -75,6 +75,28 @@ def characterise_steps(df):
                                         'step_nbr']
                                     )
     return df_out
+
+
+def characterise_steps_agg(df, step_counter='arb_step2', mode_indicator='mode', orig_step_indicator='orig_step'):
+    # Use groupby with aggregate functions
+    df_out = df.groupby(step_counter).agg(
+        stp_date=('abs_time', 'first'),
+        maxV=('volt', 'max'),
+        minV=('volt', 'min'),
+        curr=('curr', 'mean'),
+        egy_thrg=('egy_tot', 'max'),
+        egy_dchg=('egy_dchg', 'max'),
+        egy_chrg=('egy_chrg', 'max'),
+        orig_step=(orig_step_indicator, 'first'),
+        cap=('cap', lambda x: x.abs().max()),
+        step_duration=('step_time', lambda x: x.max().total_seconds()),
+        step_mode=(mode_indicator, lambda x: x.mode()[0]),
+    ).reset_index()
+
+    # Rename the step_counter column
+    df_out.rename(columns={step_counter: 'step_nbr'}, inplace=True)
+
+    return df_out.set_index('step_nbr', drop=False)
 
 
 def extract_ica_data(df, step_list):

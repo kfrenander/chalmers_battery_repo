@@ -187,7 +187,7 @@ class NewareDataReader:
 
     def _find_curr_col(self, df):
         for c in df.columns:
-            if 'Current' in c:
+            if 'Cur' in c:
                 return c
 
     def _scale_current(self, df, i_unit):
@@ -218,7 +218,8 @@ class NewareDataReader:
 
     def _rename_df_columns(self, df):
         rdf = df.copy()
-        rdf.columns = [self.col_rename_dict[c] for c in rdf.columns]
+        rdf.rename(self.col_rename_dict, axis=1, inplace=True)
+        # rdf.columns = [self.col_rename_dict[c] for c in rdf.columns]
         return rdf
 
     def _calculate_c_rate(self, df):

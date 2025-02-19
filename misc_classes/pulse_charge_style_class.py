@@ -2,8 +2,8 @@ class TestCaseStyler:
     def __init__(self):
         # Define base styles (color, marker, linestyle) once
         self.base_styles = {
-            '10 Hz 25 duty cycle pulse': {'color': '#1f77b4', 'marker': 'o', 'linestyle': '--'},
-            '10 Hz 50 duty cycle pulse': {'color': '#ff7f0e', 'marker': 's', 'linestyle': '--'},
+            '10 Hz 25 duty cycle pulse': {'color': '#0071bc', 'marker': 'o', 'linestyle': '--'},
+            '10 Hz 50 duty cycle pulse': {'color': '#d85218', 'marker': 's', 'linestyle': '--'},
             '125 Hz 25 duty cycle pulse': {'color': '#2ca02c', 'marker': '^', 'linestyle': '-.'},
             '1C reference': {'color': '#d62728', 'marker': 'x', 'linestyle': '-'},
             '1 Hz 25 duty cycle pulse': {'color': '#9467bd', 'marker': '.', 'linestyle': ':'},
@@ -12,11 +12,11 @@ class TestCaseStyler:
             '50 Hz 50 duty cycle pulse': {'color': '#7f7f7f', 'marker': '+', 'linestyle': '-.'},
             '1000mHz Pulse Charge': {'color': '#004488', 'marker': 'x', 'linestyle': '--'},
             '1000mHz Pulse Charge no pulse discharge': {'color': '#22b2b2', 'marker': 'H', 'linestyle': ':'},
-            '100mHz Pulse Charge': {'color': '#D73027', 'marker': '+', 'linestyle': '-.'},
+            '100mHz Pulse Charge': {'color': '#76ab2f', 'marker': '+', 'linestyle': '-.'},
             '100mHz Pulse Charge no pulse discharge': {'color': '#FF6347', 'marker': '^', 'linestyle': '--'},
             '500mHz Pulse Charge': {'color': '#32CD32', 'marker': 'h', 'linestyle': ':'},
             '10mHz Pulse Charge': {'color': '#FFD700', 'marker': '*', 'linestyle': '-'},
-            'Reference test constant current': {'color': '#000000', 'marker': 'o', 'linestyle': '--'},
+            'Reference test constant current': {'color': '#3f3f3f', 'marker': 'o', 'linestyle': '--'},
             '320mHz Pulse Charge': {'color': '#6e6a6a', 'marker': 'H', 'linestyle': '-.'},
         }
         # self.base_styles = {
@@ -72,7 +72,7 @@ class TestCaseStyler:
             '100mHz Pulse Charge': '100 mHz PC-PD',
             '100mHz Pulse Charge no pulse discharge': '100 mHz PC-NPD',
             '500mHz Pulse Charge': '500 mHz PC-PD',
-            '10mHz Pulse Charge': '10 mHz PC',
+            '10mHz Pulse Charge': '10 mHz PC-PD',
             'Reference test constant current': 'CC-ref',
             '320mHz Pulse Charge': '320 mHz PC-PD',
         }

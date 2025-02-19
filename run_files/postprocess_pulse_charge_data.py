@@ -10,16 +10,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 from scipy.ndimage import gaussian_filter1d
+from scipy.signal import argrelextrema
 from itertools import product, permutations
 import scienceplots
 from datetime import datetime
 plt.style.use(['science', 'nature_w_si_harding', 'grid'])
-# plt.style.use(['widthsixinches', 'ml_colors'])
-# plt.rcParams.update({
-#         "text.usetex": True,
-#         "font.family": "Computer modern",
-#         "text.latex.preamble": r'\usepackage{siunitx}'
-#     })
 
 
 def load_or_generate_data(data_from_scratch, data_dir, handler_output_dir):
@@ -156,6 +151,26 @@ def get_nearest_k_mohm(df, V_nom, col='k_mohm'):
     idx = (df_filtered['maxV'] - V_nom).abs().idxmin()
     # Return the corresponding 'k_mohm' value
     return df_filtered.loc[idx, col]
+
+
+def identify_dva_peaks_ici(hndlr):
+    dva_dict = {}
+    for cell, pscd in hndlr.merged_pscd.items():
+        for rpt, ici in pscd.ici_dict.items():
+            cycle = pscd.rpt_obj.rpt_summary.loc[rpt, 'fce']
+            soh = pscd.rpt_obj.rpt_summary.loc[rpt, 'cap_normalised']
+            if not ici.ica_df.empty and ici.ica_df.volt.max() > 4.1:
+                dvadf = ici.ica_df.copy()
+                dvadf = dvadf[dvadf.curr > 0]
+                dvadf['cap'] = dvadf.mAh - dvadf.mAh.iloc[0]
+                dvadf['dva_flt'] = gaussian_filter1d(np.gradient(dvadf.volt, dvadf.cap),
+                                                     sigma=4, mode='nearest')
+                dvadf = dvadf.reset_index()
+                peak_idx = argrelextrema(dvadf.dva_flt.to_numpy(), np.greater)
+                identifier = f'Cell{cell:.0f}_cycle{cycle}_soh{soh * 100:.2f}'
+                peak_idx = np.append(peak_idx[0], dvadf.index[-1])
+            dva_dict[identifier] = (dvadf, peak_idx)
+    return dva_dict
 
 
 data_from_scratch = 1
@@ -713,8 +728,111 @@ fig_pt.savefig(pt_name.replace('.png', '.pdf'))
 fig_avg.savefig(avg_name, dpi=400)
 fig_avg.savefig(avg_name.replace('.png', '.pdf'))
 
-# MAKE STOCK IMAGES
+
+dva_summary_dict = identify_dva_peaks_ici(handler)
+dva_peaks = {k: df.loc[pks] for k, (df, pks) in dva_summary_dict.items()}
+
+gr_peak1_rng = [3.47, 3.53]
+gr_peak2_rng = [3.77, 3.85]
+nmc_peak_rng = [4.0, 4.05]
+fc_peak_rng = [4.19, 4.22]
+
+for k, df in dva_peaks.items():
+    df['peak1_mask'] = df.volt.between(*gr_peak1_rng)
+    df['peak2_mask'] = df.volt.between(*gr_peak2_rng)
+    df['nmc_peak_mask'] = df.volt.between(*nmc_peak_rng)
+    df['fc_peak_mask'] = df.volt.between(*fc_peak_rng)
+
+peak_cap = {}
+for k, df in dva_peaks.items():
+    if not df.empty:
+        try:
+            peak_cap[k] = [df[df.peak1_mask].cap.iloc[0],
+                           df[df.peak2_mask].cap.iloc[0],
+                           df[df.nmc_peak_mask].cap.iloc[0],
+                           df[df.fc_peak_mask].cap.iloc[0]]
+        except IndexError as e:
+            print(f'Index error for {k}')
+rows = []
+for key, values in peak_cap.items():
+    match = re.match(r'(Cell\d+)_cycle(\d+)_soh(\d+)', key)
+    if match:
+        cell, cycle, soh = match.groups()
+        rows.append({
+            'cell': cell,
+            'cycle': int(cycle),
+            'soh': float(soh) / 100,
+            'cap_ne1': values[0],
+            'cap_ne2': values[1],
+            'cap_pe': values[2],
+            'cap_fc': values[3],
+        })
+
+# Generate peak track and delta-cap df
+dcap_df = pd.DataFrame(rows)  # .set_index('Cell')
+dcap_df.sort_values(by=['cell', 'cycle'], inplace=True)
+dcap_df['dcap_ne'] = dcap_df['cap_ne2'] - dcap_df['cap_ne1']
+dcap_df['dcap_pe_ne'] = dcap_df['cap_pe'] - dcap_df['cap_ne2']
+dcap_df['dcap_fc_pe'] = dcap_df['cap_fc'] - dcap_df['cap_pe']
+for col in ['cap_ne1', 'cap_ne2', 'dcap_ne', 'cap_pe', 'dcap_pe_ne', 'dcap_fc_pe']:
+    dcap_df[f'{col}_norm'] = dcap_df.groupby('cell')[col].transform(lambda x: x / x.iloc[0])
+
+
+norm_cols = [c for c in dcap_df.columns if '_norm' in c]
+names_for_plots = [
+    r'$Q_\textrm{NE,peak1}$',
+    r'$Q_\textrm{NE,peak2}$',
+    r'$\Delta Q_\textrm{NE,peaks}$',
+    r'$Q_\textrm{PE,peak}$',
+    r'$\Delta Q_\textrm{PE-NE}$',
+    r'$\Delta Q_\textrm{FC-PE}$',
+]
+plot_name_dict = dict(zip(norm_cols, names_for_plots))
+dcap_op = r"\\file00.chalmers.se\home\krifren\Provning\Analysis\pulse_charge\FirstBatch\dm_analysis"
+dcap_fit_dict = {}
 x_, y_ = plt.rcParams['figure.figsize']
+for col in norm_cols:
+    # Create a dictionary to store results
+    fit_results = []
+    fig = plt.figure(figsize=(x_, x_))
+    # plt.title(col)
+    # Perform linear regression for each cell and store results
+    for i, (cell, group) in enumerate(dcap_df.groupby('cell')):
+        # RETRIEVE STYLE FOR THIS CELL
+        cell_nbr = int(re.search(r'\d+', cell).group())
+        style = handler.merged_pscd[cell_nbr].style.copy()
+        scat_style = style.copy()
+        scat_style.pop('linestyle')
+
+        group = group.dropna(subset=['soh', col])
+        slope, intercept, r_value, p_value, std_err = stats.linregress(group['soh'], group[col])
+        fit_results.append({'cell': cell, 'slope': slope, 'PCC': r_value, 'R^2': r_value ** 2})
+        # Scatter plot of actual data points
+        plt.scatter(group['soh'], group[col], **scat_style)
+
+        # Generate fit line (over the same range as actual data)
+        # soh_range = np.linspace(0.5, 1.1, 10)
+        # soh_range = np.linspace(group['soh'].min() / 1.15, group['soh'].max() * 1.15, 5)
+        # fit_line = intercept + slope * soh_range
+        # plt.plot(soh_range, fit_line, **style)
+    soh_range = np.linspace(0.5, 1.15, 10)
+    ax = plt.gca()
+    lines, labels = ax.get_legend_handles_labels()
+    unique_lines = {label: line for line, label in zip(lines, labels)}
+    ax.legend(unique_lines.values(), unique_lines.keys())
+    plt.plot(soh_range, soh_range, color='black', linestyle='--')
+    plt.xlabel('SoH [-]')
+    plt.ylabel(f'{plot_name_dict[col]} [-]')
+    cap_col_name = os.path.join(dcap_op, f'cat2_{col}_with_trendline_and_fits_square.png')
+    fig.savefig(cap_col_name, dpi=400)
+    fig.savefig(cap_col_name.replace('.png', '.pdf'))
+    # Convert results to a DataFrame
+    fit_df = pd.DataFrame(fit_results)
+    dcap_fit_dict[col] = fit_df
+
+
+
+# MAKE STOCK IMAGES
 rpt_op = "Z:/Documents/Papers/PulseChargingPaper"
 bbox = dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.3')
 rpt_fig, rax = plt.subplots(2, 1, sharex=True, figsize=(x_, 1.5*y_))
