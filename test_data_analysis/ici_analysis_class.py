@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 from test_data_analysis.BasePecDataClass import find_step_characteristics_fast
-from test_data_analysis.rpt_analysis import characterise_steps_agg
+from test_data_analysis.rpt_analysis import characterise_steps_agg, characterise_cdaq_log
 import matplotlib.pyplot as plt
 
 
@@ -21,7 +21,7 @@ def fit_lin_ocp_slope(df, col):
 
 
 class ICIAnalysis:
-    def __init__(self, input_data):
+    def __init__(self, input_data, col_to_analyse='volt'):
         """
         Initializes the ICI analysis class.
 
@@ -34,6 +34,7 @@ class ICIAnalysis:
         self.rest_dict = {}
         self.chrg_dict = {}
         self.dchg_dict = {}
+        self.volt_col = col_to_analyse
         if isinstance(input_data, str):
             self.raw_data = pd.read_pickle(input_data)
         elif isinstance(input_data, pd.DataFrame):
@@ -43,6 +44,7 @@ class ICIAnalysis:
         self.settings = self.initialise_settings()
         self.ch_df = self.settings['characterize_fun'](self.raw_data)
         self.split_df_to_dicts()
+        self.cell_cap = self.calc_approx_cap()
 
     def initialise_settings(self):
         """
@@ -52,6 +54,8 @@ class ICIAnalysis:
         in the DataFrame `self.ici_df` and returns a configuration dictionary customized for the data's structure.
         The configuration includes instructions for charge, discharge, rest, and step counting, as well as
         a function for characterizing steps.
+
+        This is necessary to handle different data sources with different formats, primarily PEC and Neware testers.
 
         Returns:
             dict: A dictionary containing the following keys:
@@ -93,6 +97,17 @@ class ICIAnalysis:
                 'step_counter': 'arb_step2',
                 'characterize_fun': characterise_steps_agg
             }
+        elif 'current_mode' in self.raw_data.columns:
+            return {
+                'mode_column': 'current_mode',  # Default is 'mode', can be overridden to 'instruction'
+                'charge_instructions': 'CC Chg',  # Default charge instruction for 'mode'
+                'discharge_instructions': 'CC DChg',  # Default discharge instruction for 'mode'
+                'chrg_indicator': 'CC Chg',
+                'dchg_indicator': 'CC DChg',
+                'rest_instructions': 'Rest',
+                'step_counter': 'step_nbr',
+                'characterize_fun': characterise_cdaq_log
+            }
 
     def categorize_step(self):
         # Initialize the `ici_mode` and `current_mode` columns
@@ -112,6 +127,10 @@ class ICIAnalysis:
         # Update `current_mode` for interrupt steps
         self.ch_df.loc[rest_mask, 'current_mode'] = 'interrupt'
 
+    def calc_approx_cap(self):
+        tmp_df = self.raw_data
+        return tmp_df[tmp_df.curr < 0].mAh.max() - tmp_df[tmp_df.curr < 0].mAh.min()
+
     def find_ici_parameters(self):
         # df['stp_diff'] = df[self.settings['step_counter']].diff().fillna(0)
         self.categorize_step()
@@ -119,24 +138,30 @@ class ICIAnalysis:
             if row['current_mode'] == 'interrupt':
                 stp = row['step_nbr']
                 idf = self.rest_dict[stp]
-                if self.ch_df.loc[k - 1, 'step_mode'] == self.settings['chrg_indicator']:
-                    cdf = self.chrg_dict[stp - 1]
-                else:
-                    cdf = self.dchg_dict[stp - 1]
-                curr = cdf['curr'].mean()
-                pol_volt = cdf['volt'].iloc[-1]
-                # idf = df[df[self.settings['step_counter']] == stp]
-                # curr = df[df[self.settings['step_counter']] == stp - 1]['curr'].mean()
-                # pol_volt = df[df[self.settings['step_counter']] == stp - 1]['volt'].iloc[-1]
-                beg_volt = idf['volt'].iloc[0]
-                fin_volt = idf['volt'].iloc[-1]
-                R0 = (pol_volt - beg_volt) / curr
-                R10 = (pol_volt - fin_volt) / curr
-                self.ch_df.loc[k, 'R0_mohm'] = R0 * 1e3
-                self.ch_df.loc[k, 'R10_mohm'] = R10 * 1e3
-                slope, v_intcpt = fit_lin_vs_sqrt_time(idf, 'volt')
-                self.ch_df.loc[k, 'k'] = - slope / curr
-                self.ch_df.loc[k, 'R_reg_mohm'] = 1e3 * (pol_volt - v_intcpt) / curr
+                try:
+                    if self.ch_df.loc[k - 1, 'step_mode'] == self.settings['chrg_indicator']:
+                        cdf = self.chrg_dict[stp - 1]
+                    else:
+                        cdf = self.dchg_dict[stp - 1]
+                    curr = cdf['curr'].median()
+                    pol_volt = cdf[self.volt_col].iloc[-1]
+                    # idf = df[df[self.settings['step_counter']] == stp]
+                    # curr = df[df[self.settings['step_counter']] == stp - 1]['curr'].mean()
+                    # pol_volt = df[df[self.settings['step_counter']] == stp - 1][self.volt_col].iloc[-1]
+                    beg_volt = idf[self.volt_col].iloc[0]
+                    fin_volt = idf[self.volt_col].iloc[-1]
+                    slope, v_intcpt = fit_lin_vs_sqrt_time(idf, self.volt_col)
+                    R0_crude = (pol_volt - beg_volt) / curr
+                    R0 = (pol_volt - beg_volt) / curr
+                    R10 = (pol_volt - fin_volt) / curr
+                    self.ch_df.loc[k, 'R0_mohm'] = R0 * 1e3
+                    self.ch_df.loc[k, 'R10_mohm'] = R10 * 1e3
+                    self.ch_df.loc[k, 'k'] = - slope / curr
+                    self.ch_df.loc[k, 'k_mohm'] = - 1000 * slope / curr
+                    self.ch_df.loc[k, 'R_reg_mohm'] = 1e3 * (pol_volt - v_intcpt) / curr
+                except KeyError as e:
+                    print(f'No previous step to analyse for {k}')
+                    print(e)
             else:
                 stp = row['step_nbr']
                 if row['step_mode'] == self.settings['chrg_indicator']:
@@ -223,10 +248,15 @@ class ICIAnalysis:
             idx_to_keep = self.filter_indices_positive(voltages, indices, mode, v_flt)
 
             ica_df = self.raw_data.loc[idx_to_keep, :].copy()
-
+            if ica_df.mAh.max() - ica_df.mAh.min() > 1000:
+                cap_scaling = 1e-3
+            else:
+                cap_scaling = 1
             # Compute the gradient for 'ica_raw' and apply Gaussian filtering
-            ica_df['ica_raw'] = np.gradient(mode_mapping[mode]['mAh_factor'] * ica_df['mAh'], ica_df['volt'])
-            ica_df['ica_gauss'] = gaussian_filter1d(ica_df['ica_raw'], sigma=1.3, mode='nearest')
+            ica_df['ica_raw'] = np.gradient(mode_mapping[mode]['mAh_factor'] * ica_df['mAh'] * cap_scaling,
+                                            ica_df[self.volt_col])
+            ica_df['ica_gauss'] = gaussian_filter1d(ica_df['ica_raw'], sigma=3, mode='nearest')
+            ica_df['ica_mode'] = mode
 
             dfs[mode] = ica_df
 
@@ -254,7 +284,7 @@ class ICIAnalysis:
                 self.check_linear_fit(df)
 
     def check_linear_fit(self, df):
-        df.loc[:, 'sqrt_fit'] = np.polyval(fit_lin_vs_sqrt_time(df, col='volt'),
+        df.loc[:, 'sqrt_fit'] = np.polyval(fit_lin_vs_sqrt_time(df, col=self.volt_col),
                                            np.sqrt(df['float_step_time']))
 
     def plot_linear_fit(self, step_id=None, fig=None, ax=None):
@@ -264,12 +294,12 @@ class ICIAnalysis:
             self.store_linear_fit(step_id)
             df = self.rest_dict[step_id]
             ax.plot(np.sqrt(df.float_step_time), df.sqrt_fit, linestyle='dashed')
-            ax.plot(np.sqrt(df.float_step_time), df.volt)
+            ax.plot(np.sqrt(df.float_step_time), df[self.volt_col])
         else:
             self.store_linear_fit()
             for k, df in self.rest_dict.items():
                 ax.plot(np.sqrt(df.float_step_time), df.sqrt_fit, linestyle='dashed')
-                ax.plot(np.sqrt(df.float_step_time), df.volt)
+                ax.plot(np.sqrt(df.float_step_time), df[self.volt_col])
         return fig, ax
 
     def perform_ici_analysis(self):
@@ -284,7 +314,7 @@ if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
     import os
     pd.options.mode.chained_assignment = None
-    plt.style.use(['widthsixinches', 'ml_colors', 'noframe'])
+    plt.style.use(['widthsixinches', 'ml_colors'])
     plt.rcParams.update({
         "text.usetex": True,
         "font.family": "Times New Roman",
@@ -311,3 +341,9 @@ if __name__ == '__main__':
     fig, ax = neware_ici_analysis.plot_linear_fit()
     ax.set_xlabel(r'Square root time [\unit{\sqrt\second}]')
     ax.set_ylabel(r'Voltage [\unit{\volt}]')
+    plt.figure()
+    plt.plot(idfn.volt, idfn.ica_gauss, label='Neware')
+    plt.plot(idfp.volt, idfp.ica_gauss, label='PEC')
+    plt.legend()
+    plt.xlabel(r'Voltage [\unit{\volt}]')
+    plt.ylabel(r'dQ/dV [\unit{{\ampere\hour}\per\volt}]')
