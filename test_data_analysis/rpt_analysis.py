@@ -99,6 +99,23 @@ def characterise_steps_agg(df, step_counter='arb_step2', mode_indicator='mode', 
     return df_out.set_index('step_nbr', drop=False)
 
 
+def characterise_cdaq_log(df, step_counter='step_nbr', mode_indicator='current_mode'):
+    # Use groupby with aggregate functions
+    df_out = df.groupby(step_counter).agg(
+        maxV=('volt', 'max'),
+        minV=('volt', 'min'),
+        curr=('curr', 'median'),
+        cap=('mAh', lambda x: (x - x.iloc[0]).abs().max()),
+        step_duration=('float_step_time', lambda x: x.max()),
+        step_mode=(mode_indicator, lambda x: x.mode().iloc[0]),
+    ).reset_index()
+
+    # Rename the step_counter column
+    df_out.rename(columns={step_counter: 'step_nbr'}, inplace=True)
+
+    return df_out.set_index('step_nbr', drop=False)
+
+
 def extract_ica_data(df, step_list):
     ica_df = pd.DataFrame()
     for stp in step_list:
