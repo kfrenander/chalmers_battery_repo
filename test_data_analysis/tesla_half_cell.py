@@ -1,7 +1,7 @@
 import pandas as pd
 import math
 import matplotlib.pyplot as plt
-from scipy.integrate import cumtrapz, trapz
+from scipy.integrate import cumulative_trapezoid, trapezoid
 import numpy as np
 from scipy.signal import savgol_filter
 from scipy.ndimage import gaussian_filter1d
@@ -45,7 +45,7 @@ def data_reader(path):
     :return:
     """
     df = pd.read_csv(path, sep='\t', names=['time', 'curr', 'pot'])
-    df.loc[:, 'cap'] = cumtrapz(df.curr, df.time / 3600, initial=0)
+    df.loc[:, 'cap'] = cumulative_trapezoid(df.curr, df.time / 3600, initial=0)
     nbr_of_switches = df.loc[abs(df.curr.diff()) > 1e-4].shape[0]
     df.loc[abs(df.curr.diff()) > 1e-4, 'step'] = range(1, nbr_of_switches + 1)
     df.loc[:, 'step'] = df.loc[:, 'step'].fillna(method='ffill').fillna(0)
@@ -194,7 +194,7 @@ def find_hysteresis(df, rng):
 
 
 def calc_step_caps(df):
-    cap_arr = np.array(df.groupby('step').apply(lambda x: trapz(x.curr, x.time) / 3.6))
+    cap_arr = np.array(df.groupby('step').apply(lambda x: trapezoid(x.curr, x.time) / 3.6))
     cap_chrg = cap_arr[cap_arr > 1e-3]
     cap_dchg = cap_arr[cap_arr < -1e-3]
     # Filter out deviations larger than one standard deviation to remove outliers
@@ -280,7 +280,7 @@ def plot_ica(df_dlth, df_lith):
 def add_step_cap(data_dict):
     for i in data_dict:
         tmp_df = data_dict[i]
-        tmp_df.loc[:, 'step_cap'] = cumtrapz(tmp_df.curr.abs(), tmp_df.time / 3600, initial=0)
+        tmp_df.loc[:, 'step_cap'] = cumulative_trapezoid(tmp_df.curr.abs(), tmp_df.time / 3600, initial=0)
         data_dict[i] = tmp_df
     return data_dict
 

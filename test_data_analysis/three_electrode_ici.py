@@ -2,7 +2,7 @@ import datetime as dt
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 from test_data_analysis.tesla_half_cell import gaussianfilterint
 from test_data_analysis.BaseNewareDataClass import BaseNewareData as bnd
 from test_data_analysis.ica_analysis import ica_on_arb_data
@@ -601,7 +601,7 @@ if __name__ == '__main__':
                 os.mkdir(op_folder)
             df = find_rest_step(df)
             df.loc[:, 'step_time_float'] = pd.to_timedelta(df.step_time).astype('timedelta64[ms]') / 1000
-            df.loc[:, 'mAh'] = cumtrapz(df.curr, df.float_time / 3600, initial=0)
+            df.loc[:, 'mAh'] = cumulative_trapezoid(df.curr, df.float_time / 3600, initial=0)
             df.loc[:, 'mAh'] = df.loc[:, 'mAh'] - df.mAh.min()
             fig, ax = plt.subplots(1, 1)
             aux_bool = any('aux' in word for word in df.columns)

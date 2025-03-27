@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 
 
 def coin_cell_data_reader(file_path):
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     ax.set_title('Voltage and Current v time')
     plt.tight_layout()
 
-    df_1c['mAh'] = cumtrapz(df_1c.curr, df_1c.time, initial=0) / 3.6
+    df_1c['mAh'] = cumulative_trapezoid(df_1c.curr, df_1c.time, initial=0) / 3.6
     fig, ax = plt.subplots(1, 1)
     ax.plot(df_1c.mAh, df_1c.volt)
     fig2 = cap_v_volt_multicolor(df_1c, name='1C Cycling')

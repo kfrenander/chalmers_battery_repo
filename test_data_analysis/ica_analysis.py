@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime as dt
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 from scipy.signal import savgol_filter, argrelextrema
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal.windows import gaussian
@@ -239,7 +239,7 @@ def remove_faulty_points(df):
     return df
 
 
-def perform_ica(df, volt_col='volt', prespan=0.0055):
+def perform_ica(df, volt_col='volt', prespan=0.0055, gausspan=0.03):
     """
     Summary function that performs all necessary steps to perform ICA/DVA
     :param df:
@@ -253,13 +253,13 @@ def perform_ica(df, volt_col='volt', prespan=0.0055):
     if not chrg_df.empty:
         chrg_df = smooth_with_span(chrg_df, col=volt_col, prespan=prespan)
         chrg_df = simplified_ica_dva(chrg_df)
-        chrg_df.loc[:, 'ica_gauss'] = gaussianfilterint(chrg_df['volt'], chrg_df['ica'])
-        chrg_df.loc[:, 'dva_gauss'] = gaussianfilterint(chrg_df['volt'], chrg_df['dva'])
+        chrg_df.loc[:, 'ica_gauss'] = gaussianfilterint(chrg_df['volt'], chrg_df['ica'], gausspan=gausspan)
+        chrg_df.loc[:, 'dva_gauss'] = gaussianfilterint(chrg_df['volt'], chrg_df['dva'], gausspan=gausspan)
     if not dchg_df.empty:
         dchg_df = smooth_with_span(dchg_df, col=volt_col, prespan=prespan)
         dchg_df = simplified_ica_dva(dchg_df)
-        dchg_df.loc[:, 'ica_gauss'] = gaussianfilterint(dchg_df['volt'], dchg_df['ica'])
-        dchg_df.loc[:, 'dva_gauss'] = gaussianfilterint(dchg_df['volt'], dchg_df['dva'])
+        dchg_df.loc[:, 'ica_gauss'] = gaussianfilterint(dchg_df['volt'], dchg_df['ica'], gausspan=gausspan)
+        dchg_df.loc[:, 'dva_gauss'] = gaussianfilterint(dchg_df['volt'], dchg_df['dva'], gausspan=gausspan)
     df = pd.concat([chrg_df, dchg_df])
     return df
 

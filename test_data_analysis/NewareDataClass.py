@@ -1,7 +1,7 @@
 import sys
 sys.path.append(r'C:\battery-model\PythonScripts')
 import pandas as pd
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 import datetime as dt
 import numpy as np
 import re
@@ -186,9 +186,9 @@ class NewareData(object):
         df['pwr'] = df.curr / 1000 * df.volt
         df['pwr_chrg'] = df.pwr.mask(df.pwr < 0, 0)
         df['pwr_dchg'] = df.pwr.mask(df.pwr > 0, 0)
-        df['egy_tot'] = cumtrapz(df.pwr.abs() / (1000*3600), df.float_time, initial=0)
-        df['egy_chrg'] = cumtrapz(df.pwr_chrg.abs() / (1000*3600), df.float_time, initial=0)
-        df['egy_dchg'] = cumtrapz(df.pwr_dchg.abs() / (1000*3600), df.float_time, initial=0)
+        df['egy_tot'] = cumulative_trapezoid(df.pwr.abs() / (1000*3600), df.float_time, initial=0)
+        df['egy_chrg'] = cumulative_trapezoid(df.pwr_chrg.abs() / (1000*3600), df.float_time, initial=0)
+        df['egy_dchg'] = cumulative_trapezoid(df.pwr_dchg.abs() / (1000*3600), df.float_time, initial=0)
         if not df.arb_step2.is_monotonic:
             df = self.sum_idx(df, 'arb_step2')
             # reset_idx = df.arb_step2[df.arb_step2.diff() < 0].index.values[0]
@@ -196,10 +196,10 @@ class NewareData(object):
             # df.loc[reset_idx:, 'Measurement'] = df.loc[reset_idx:, 'Measurement'] + df.loc[reset_idx - 1, 'Measurement']
         # df = df.sort_values(by='Measurement')
         if df['curr'].abs().max() > 100:
-            df['mAh'] = cumtrapz(df.curr, df.float_time, initial=0) / 3600
+            df['mAh'] = cumulative_trapezoid(df.curr, df.float_time, initial=0) / 3600
             df['curr'] = df.curr / 1000
         else:
-            df['mAh'] = cumtrapz(df.curr, df.float_time, initial=0) * 1000 / 3600
+            df['mAh'] = cumulative_trapezoid(df.curr, df.float_time, initial=0) * 1000 / 3600
             df['cap'] = df['cap'] * 1000
         self.dyn_df = df
         return self

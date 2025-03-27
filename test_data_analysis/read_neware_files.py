@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import sys
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 from test_data_analysis.neware_column_mapper import define_neware_renaming, define_neware_translation_dict
 import warnings
 import re
@@ -242,13 +242,13 @@ class NewareDataReader:
             df['arb_step2'] = (df['orig_step'].diff() != 0).cumsum()
         posix_time = df['abs_time'].apply(lambda x: x.timestamp())
         df['float_time'] = posix_time - posix_time[0]
-        df['mAh'] = cumtrapz(df.curr, df.float_time / 3.6, initial=0)
+        df['mAh'] = cumulative_trapezoid(df.curr, df.float_time / 3.6, initial=0)
         df['pwr'] = df['volt'] * df['curr']
         df['pwr_chrg'] = df.pwr.mask(df.pwr < 0, 0)
         df['pwr_dchg'] = df.pwr.mask(df.pwr > 0, 0)
-        df['egy_tot'] = cumtrapz(df.pwr.abs() / (1000 * 3600), df.float_time, initial=0)
-        df['egy_chrg'] = cumtrapz(df.pwr_chrg.abs() / (1000 * 3600), df.float_time, initial=0)
-        df['egy_dchg'] = cumtrapz(df.pwr_dchg.abs() / (1000 * 3600), df.float_time, initial=0)
+        df['egy_tot'] = cumulative_trapezoid(df.pwr.abs() / (1000 * 3600), df.float_time, initial=0)
+        df['egy_chrg'] = cumulative_trapezoid(df.pwr_chrg.abs() / (1000 * 3600), df.float_time, initial=0)
+        df['egy_dchg'] = cumulative_trapezoid(df.pwr_dchg.abs() / (1000 * 3600), df.float_time, initial=0)
         return df
 
 

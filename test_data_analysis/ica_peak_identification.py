@@ -1,4 +1,4 @@
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
 from test_data_analysis.tesla_half_cell import data_reader
@@ -27,8 +27,8 @@ part_df_pe = df_pe[df_pe['step'] == 7]
 part_df_ne = df_ne[df_ne['step'] == 7]
 
 # Negative sign in integral to compensate discharge current
-part_df_ne.loc[:, 'cap_cell'] = cumtrapz(-part_df_ne['curr'], part_df_ne['time'], initial=0) / 3.6
-part_df_pe.loc[:, 'cap_cell'] = cumtrapz(part_df_pe['curr'], part_df_pe['time'], initial=0) / 3.6
+part_df_ne.loc[:, 'cap_cell'] = cumulative_trapezoid(-part_df_ne['curr'], part_df_ne['time'], initial=0) / 3.6
+part_df_pe.loc[:, 'cap_cell'] = cumulative_trapezoid(part_df_pe['curr'], part_df_pe['time'], initial=0) / 3.6
 part_df_ne.loc[:, 'sol'] = part_df_ne['cap'] / part_df_ne.cap.max()
 part_df_pe.loc[:, 'sol'] = 1 - part_df_pe['cap'] / part_df_pe.cap.max()
 

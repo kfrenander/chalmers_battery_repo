@@ -27,7 +27,7 @@ def save_profile(time, curr):
     op_file_curr = 'BDA_curr_profile_t_tot_{}s_{}.csv'.format(int(time.max()), today)
     np.savetxt(os.path.join(op_dir, op_file_full), np.array([time, curr]).T, delimiter=',', fmt='%.4f')
     np.savetxt(os.path.join(op_dir, op_file_curr), curr, delimiter=',', fmt='%.4f')
-    print('Average current is {}'.format(np.trapz(curr, time) / time.max()))
+    print('Average current is {}'.format(np.trapezoid(curr, time) / time.max()))
     return None
 
 

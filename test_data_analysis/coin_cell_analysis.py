@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 from test_data_analysis.basic_plotting import cap_v_volt_multicolor
 from test_data_analysis.coin_cell_reader import coin_cell_data_reader
 plt.style.use('ggplot')
@@ -46,7 +46,7 @@ ax.set_xlabel('Time')
 ax.set_title('Voltage and Current v time')
 plt.tight_layout()
 
-df_1c.loc[:, 'mAh'] = cumtrapz(df_1c.curr, df_1c.time, initial=0) / 3.6
+df_1c.loc[:, 'mAh'] = cumulative_trapezoid(df_1c.curr, df_1c.time, initial=0) / 3.6
 fig, ax = plt.subplots(1, 1)
 ax.plot(df_1c.mAh, df_1c.volt)
 fig2 = cap_v_volt_multicolor(df_1c, name='1C Cycling')

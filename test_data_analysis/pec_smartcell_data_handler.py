@@ -3,9 +3,9 @@ import re
 import time
 from collections import defaultdict
 from functools import reduce
-import matplotlib.pyplot as plt
 import pandas as pd
-from scipy.integrate import trapz
+import numpy as np
+from scipy.integrate import trapezoid
 from test_data_analysis.PecSmartCellData import PecSmartCellData
 
 
@@ -94,12 +94,13 @@ class PecSmartCellDataHandler:
         last_fce = None
         for i in range(len(merged_df)):
             current_fce = merged_df.at[i, 'fce']
-            if last_fce is not None and current_fce + offset <= last_fce:
+            if last_fce is not None and current_fce + offset < last_fce:
                 offset = last_fce
-                if current_fce == 0:
-                    offset += 20
+            elif current_fce + offset == last_fce:
+                offset += 20
             merged_df.at[i, 'fce'] = current_fce + offset
             last_fce = merged_df.at[i, 'fce']
+            print(offset, current_fce, current_fce + offset, last_fce)
 
         return merged_df
 
@@ -119,7 +120,38 @@ class PecSmartCellDataHandler:
 
             self.merged_condition_data[condition] = {
                 'merged_df': merged_df,
-                'style': list(group.values())[0].style  # Assume style is consistent within the group
+                'style': list(group.values())[0].style.copy()  # Assume style is consistent within the group
+            }
+
+    def merge_test_condition_data_arbitrary_replicates(self):
+        """
+        Merge data by test condition, calculate mean and standard deviation across replicates.
+        """
+        for condition, group in self.grouped_by_condition.items():
+            # Collect rpt_summary dataframes for this condition
+            df_dict = {cell: pscd.rpt_obj.rpt_summary for cell, pscd in group.items()}
+            # Ensure 'fce' is numeric in all dataframes
+            for key in df_dict:
+                df_dict[key]['fce'] = pd.to_numeric(df_dict[key]['fce'],
+                                                    errors='coerce')  # Convert, coercing errors to NaN
+                df_dict[key] = df_dict[key].sort_values('fce')  # Required for merge_asof
+
+            df_iter = iter(df_dict.items())
+            first_key, merged_df = next(df_iter)
+            for (key, df) in df_iter:
+                merged_df = pd.merge_asof(
+                    merged_df,
+                    df,
+                    on='fce',
+                    suffixes=('', f'_{key}')
+                )
+            # Calculate mean and standard deviation for normalized capacity
+            merged_df['mean_capacity'] = merged_df.filter(like='cap_norm').mean(axis=1)
+            merged_df['sigma_capacity'] = merged_df.filter(like='cap_norm').std(axis=1)
+
+            self.merged_condition_data[condition] = {
+                'merged_df': merged_df,
+                'style': list(group.values())[0].style.copy()  # Assume style is consistent within the group
             }
 
     def filter_by_cell_id(self, cell_id):
@@ -133,15 +165,15 @@ class PecSmartCellDataHandler:
 
     def calculate_mean_temperature(self):
         mean_temperature_dict = {
-            k: trapz(pscd.dyn_data.temperature, pscd.dyn_data.float_time) / pscd.dyn_data.float_time.max()
+            k: trapezoid(pscd.dyn_data.temperature, pscd.dyn_data.float_time) / pscd.dyn_data.float_time.max()
             for k, pscd in self.merged_pscd.items()
         }
         return pd.DataFrame.from_dict(mean_temperature_dict, orient='index', columns=['Mean Temperature'])
 
 
 if __name__ == "__main__":
-    data_dir = r"\\sol.ita.chalmers.se\groups\batt_lab_data\pulse_chrg_test\high_frequency_testing\PEC_export"
-    # data_dir = r"D:\PEC_logs\MWE_merge"
+    # data_dir = r"\\sol.ita.chalmers.se\groups\batt_lab_data\pulse_chrg_test\high_frequency_testing\PEC_export"
+    data_dir = r"D:\PEC_logs\MWE_merge2"
     handler = PecSmartCellDataHandler(data_dir)
 
     mean_temps = handler.calculate_mean_temperature()

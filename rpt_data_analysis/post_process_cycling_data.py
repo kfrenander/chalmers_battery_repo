@@ -2,7 +2,7 @@ import os
 import re
 import pandas as pd
 import numpy as np
-from scipy.integrate import trapz
+from scipy.integrate import trapezoid
 from misc_classes.test_metadata_reader import MetadataReader
 from scipy.optimize import curve_fit, root_scalar
 from test_data_analysis.ici_analysis_class import ICIAnalysis
@@ -304,8 +304,14 @@ class CycleAgeingDataReader:
     def make_temperature_summary(self):
         if not isinstance(self.dyn_data, pd.DataFrame):
             self.read_dynamic_data()
-        self.average_temperature = (trapz(self.dyn_data.temperature, self.dyn_data.float_time)
-                                    / self.dyn_data.float_time.max())
+        if 'temperature' in self.dyn_data.columns:
+            self.average_temperature = (trapezoid(self.dyn_data.temperature, self.dyn_data.float_time)
+                                        / self.dyn_data.float_time.max())
+        elif 'aux_T_1' in self.dyn_data.columns:
+            self.average_temperature = (trapezoid(self.dyn_data.aux_T_1, self.dyn_data.float_time)
+                                        / self.dyn_data.float_time.max())
+        else:
+            print(f'No temperature data found in dynamic data for {self.chnl_id}')
         # TODO: Implement some kind of histogram for temperature visualisation
 
     def find_fce_at_given_q(self, q_target):
