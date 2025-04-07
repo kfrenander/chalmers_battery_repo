@@ -1,7 +1,8 @@
 import pprint
 import queue
 import nidaqmx
-from nidaqmx.constants import AcquisitionType
+from nidaqmx.constants import AcquisitionType, BridgeUnits, ExcitationSource, BridgeConfiguration
+from nidaqmx.stream_readers import AnalogMultiChannelReader
 import time
 import json
 from datetime import datetime
@@ -9,6 +10,53 @@ import os
 import csv
 import numpy as np
 import threading
+
+
+def identify_device_type(device):
+    """ Find type of measurement a device is performing """
+    if "9252" in device.product_type:
+        return "voltage"
+    elif "9253" in device.product_type:
+        return "current"
+    elif "9236" in device.product_type:
+        return "quarter_bridge"
+    else:
+        return "unknown"
+
+
+def add_voltage_device(device, task):
+    """ Add a voltage input chanel """
+    for ai_chan in device.ai_physical_chans:
+        try:
+            task.ai_channels.add_ai_voltage_chan(ai_chan.name, min_val=-10.0, max_val=10.0)
+        except Exception as e:
+            print(f"Error adding voltage channel {ai_chan.name}: {e}")
+
+
+def add_current_device(device, task):
+    """ Add a current input channel """
+    for ai_chan in device.ai_physical_chans:
+        try:
+            task.ai_channels.add_ai_current_chan(ai_chan.name, min_val=-0.021, max_val=0.021)
+        except Exception as e:
+            print(f"Error adding current channel {ai_chan.name}: {e}")
+
+
+def add_q_bridge_device(device, task):
+    """ A q-bridge input channel """
+    for ai_chan in device.ai_physical_chans:
+        try:
+            task.ai_channels.add_ai_bridge_chan(
+                physical_channel=ai_chan.name,
+                min_val=0.001,
+                max_val=0.001,
+                units=BridgeUnits.VOLTS_PER_VOLT,
+                voltage_excit_source=ExcitationSource.INTERNAL,
+                bridge_config=BridgeConfiguration.QUARTER_BRIDGE,
+                voltage_excit_val=3.3
+            )
+        except Exception as e:
+            print(f"Error adding q-bridge channel {ai_chan.name}: {e}")
 
 
 class NIDAQmxDevice:
@@ -73,13 +121,33 @@ class NIDAQmxManager:
     def list_analog_input_channels(self):
         """List all available analog input channels."""
         devices = self.system.devices
+        channel_list = []
         if devices:
             print("Available Analog Input Channels:")
             for device in devices:
                 for ai_physical_channel in device.ai_physical_chans:
                     print(f"  - Device: {device.product_type}, Channel: {ai_physical_channel}")
+                    channel_list.append(ai_physical_channel.name)
         else:
             print("No NI-DAQmx devices found.")
+        return channel_list
+
+    def store_channel_types(self):
+        """ List available ai channels with corresponding type """
+        devices = self.system.devices
+        d_list = []
+        ch_list = []
+        if devices:
+            for device in devices:
+                for ai_chan in device.ai_physical_chans:
+                    ch_list.append(ai_chan.name)
+                    d_list.append(device)
+            measurement_type_list = [identify_device_type(dev) for dev in d_list]
+            channel_and_type = dict(zip(ch_list, zip(measurement_type_list, d_list)))
+        else:
+            print("No NI-DAQmx devices found.")
+            channel_and_type = ''
+        return channel_and_type
 
     def take_channel_readings(self, num_readings=10):
         """Take readings from each channel."""
@@ -89,13 +157,20 @@ class NIDAQmxManager:
             with nidaqmx.Task() as task:
                 print("Taking Channel Readings:")
                 for device in devices:
-                    for ai_physical_channel in device.ai_physical_chans:
-                        try:
-                            task.ai_channels.add_ai_voltage_chan(f"{ai_physical_channel.name}")
-                            print(f"  - Device: {device.product_type}, Channel: {ai_physical_channel.name}")
-                            readings_dict[ai_physical_channel.name] = None
-                        except:
-                            print(f'No reading for {ai_physical_channel}')
+                    device_type = identify_device_type(device)
+                    if device_type == 'voltage':
+                        add_voltage_device(device, task)
+                    elif device_type == 'current':
+                        add_current_device(device, task)
+                    elif device_type == 'quarter_bridge':
+                        add_q_bridge_device(device, task)
+                    # for ai_physical_channel in device.ai_physical_chans:
+                        # try:
+                        #     task.ai_channels.add_ai_voltage_chan(f"{ai_physical_channel.name}")
+                        #     print(f"  - Device: {device.product_type}, Channel: {ai_physical_channel.name}")
+                        #     readings_dict[ai_physical_channel.name] = None
+                        # except:
+                        #     print(f'No reading for {ai_physical_channel}')
                 task.timing.cfg_samp_clk_timing(rate=1000, sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
                 data = np.array(task.read(number_of_samples_per_channel=num_readings))
             for nm, dta in zip(readings_dict.keys(), np.mean(data, axis=1)):
@@ -126,11 +201,15 @@ class NIDAQmxManager:
 
 
 class DataAcquisitionSettings:
-    def __init__(self, channel_names, sampling_rate, output_rate, duration, filename, output_file,
+    def __init__(self, sampling_rate, output_rate, duration, filename, output_file,
                  nbr_of_digits=7,
                  log_condition='default',
-                 log_threshold=0.):
+                 log_threshold=0.,
+                 logging_setup='device-based',
+                 device_to_log='all',
+                 channel_names=''):
         self.channel_names = channel_names
+        self.check_logging_channels()
         self.nbr_of_channels = int(len(channel_names))
         self.sampling_rate = sampling_rate
         self.output_rate = output_rate
@@ -141,6 +220,8 @@ class DataAcquisitionSettings:
         self.nbr_of_digits = nbr_of_digits
         self.log_condition = log_condition
         self.log_threshold = log_threshold
+        self.logging_setup = logging_setup
+        self.device_to_log = device_to_log
         self.set_threshold()
 
     def to_json(self):
@@ -163,7 +244,6 @@ class DataAcquisitionSettings:
                 self.log_threshold = self.prompt_user_for_threshold()
             print(f'Logging with mode {self.log_condition} and trigger threshold {self.log_threshold * 1e3:.2f}mV')
 
-
     def prompt_user_for_threshold(self):
         while True:
             try:
@@ -175,12 +255,25 @@ class DataAcquisitionSettings:
             except ValueError:
                 print("Invalid input. Please enter a valid float value.")
 
+    def check_logging_channels(self):
+        if not any(self.channel_names):
+            mgr = NIDAQmxManager()
+            all_channel_names = mgr.store_channel_types()
+            if self.device_to_log == 'all':
+                self.channel_names = all_channel_names.copy()
+            else:
+                channel_names = {}
+                for ch, (type, device) in all_channel_names.items():
+                    if self.device_to_log in ch:
+                        channel_names[ch] = (type, device)
+                self.channel_names = channel_names
+
 
 class DataAcquisition:
     def __init__(self, settings):
         self.settings = settings
-        self.data_queue = queue.Queue()
-        self.time_queue = queue.Queue()
+        self.data_queue = queue.Queue(maxsize=200)
+        self.time_queue = queue.Queue(maxsize=200)
         self.data = []
         self.start_time = time.time()
         self.last_log_time = 0
@@ -190,19 +283,34 @@ class DataAcquisition:
         try:
             with nidaqmx.Task() as task:
                 try:
-                    for channel_name in self.settings.channel_names:
-                        task.ai_channels.add_ai_voltage_chan(channel_name, min_val=-10.0, max_val=10.0)
+                    # for channel_name in self.settings.channel_names:
+                    #     task.ai_channels.add_ai_voltage_chan(channel_name, min_val=-10.0, max_val=10.0)
+                    for channel_name, (channel_type, device) in self.settings.channel_names.items():
+                        if channel_type == 'voltage':
+                            add_voltage_device(channel_name, task)
+                        elif channel_type == 'current':
+                            add_current_device(channel_name, task)
+                        elif channel_type == 'quarter_bridge':
+                            add_q_bridge_device(channel_name, task)
                     task.timing.cfg_samp_clk_timing(rate=self.settings.sampling_rate,
                                                     sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
+
+                    # Initialise buffer and reader
+                    buffer = np.empty((len(self.settings.channel_names), self.settings.n_samples), dtype=np.float64)
+                    reader = AnalogMultiChannelReader(task_in_stream=task.in_stream)
 
                     def callback(task_handle, every_n_samples_event_type, number_of_samples, callback_data):
                         """Callback function for reading signals."""
                         if task.is_task_done():
                             return 1
                         else:
-                            tmp_data = task.read(number_of_samples_per_channel=self.settings.n_samples)
-                            self.data_queue.put(tmp_data)
-                            self.time_queue.put(time.time())
+                            reader.read_many_sample(buffer, self.settings.n_samples)
+                            # tmp_data = task.read(number_of_samples_per_channel=self.settings.n_samples)
+                            try:
+                                self.data_queue.put(buffer.copy(), block=False)
+                                self.time_queue.put(time.time(), block=False)
+                            except queue.Full:
+                                print("[WARNING] Data queue is full. Dropping samples to avoid blocking DAQ.")
                             return 0
 
                     task.register_every_n_samples_acquired_into_buffer_event(self.settings.n_samples, callback)
@@ -294,11 +402,12 @@ class DataAcquisition:
 
 class Main:
     def __init__(self):
-        self.base_folder = r"E:\HaliBatt\SiGrThreeElectrode\cycling_data"
+        self.base_folder = "/data/nidaqmx-logs/halibatt"
         self.output_folder = ''
         self.data_file = ''
         self.device_info_file = ''
         self.measurement_settings_file = ''
+        self.channel_names = ''
 
     def run(self):
         self.set_up_logging()
@@ -314,7 +423,8 @@ class Main:
                                            output_file=self.measurement_settings_file,
                                            filename=self.data_file,
                                            log_condition='voltage',
-                                           log_threshold=100e-6)
+                                           log_threshold=100e-6,
+                                           device_to_log='B5204')
         acquisition = DataAcquisition(settings)
         acquisition.start_acquisition_and_averaging()
 
