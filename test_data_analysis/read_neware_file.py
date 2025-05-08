@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 
 
 def read_neware_xls(file_path, calc_c_rate=False):
@@ -23,14 +23,14 @@ def read_neware_xls(file_path, calc_c_rate=False):
     df['pwr'] = df.curr / 1000 * df.volt
     df['pwr_chrg'] = df.pwr.mask(df.pwr < 0, 0)
     df['pwr_dchg'] = df.pwr.mask(df.pwr > 0, 0)
-    df['egy_tot'] = cumtrapz(df.pwr.abs() / (1000 * 3600), df.float_time, initial=0)
-    df['egy_chrg'] = cumtrapz(df.pwr_chrg.abs() / (1000 * 3600), df.float_time, initial=0)
-    df['egy_dchg'] = cumtrapz(df.pwr_dchg.abs() / (1000 * 3600), df.float_time, initial=0)
+    df['egy_tot'] = cumulative_trapezoid(df.pwr.abs() / (1000 * 3600), df.float_time, initial=0)
+    df['egy_chrg'] = cumulative_trapezoid(df.pwr_chrg.abs() / (1000 * 3600), df.float_time, initial=0)
+    df['egy_dchg'] = cumulative_trapezoid(df.pwr_dchg.abs() / (1000 * 3600), df.float_time, initial=0)
     if mA:
-        df['mAh'] = cumtrapz(df.curr, df.float_time, initial=0) / 3600
+        df['mAh'] = cumulative_trapezoid(df.curr, df.float_time, initial=0) / 3600
         df['curr'] = df.curr / 1000
     else:
-        df['mAh'] = cumtrapz(df.curr, df.float_time, initial=0) * 1000 / 3600
+        df['mAh'] = cumulative_trapezoid(df.curr, df.float_time, initial=0) * 1000 / 3600
         df['cap'] = df['cap'] * 1000
     if calc_c_rate:
         if mA:
@@ -185,7 +185,7 @@ def read_neware_80_xls(fname, curr_unit='milli'):
     df['abs_time'] = pd.to_datetime(df['abs_time'], format='%Y-%m-%d %H:%M:%S')
     df['float_time'] = pd.to_timedelta(df['total_time']).astype('int64') / 1e9
     df.loc[:, 'step_time_float'] = pd.to_timedelta(df.step_time).astype('timedelta64[ms]')
-    df.loc[:, 'mAh'] = cumtrapz(df.curr, df.float_time / 3.6, initial=0)
+    df.loc[:, 'mAh'] = cumulative_trapezoid(df.curr, df.float_time / 3.6, initial=0)
     return df
 
 
