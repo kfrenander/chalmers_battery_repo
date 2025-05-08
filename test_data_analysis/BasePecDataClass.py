@@ -1,6 +1,6 @@
 import pandas as pd
 import re
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 
 
 def find_step_characteristics(df):
@@ -153,7 +153,7 @@ class BasePecData(object):
             # raw_df.columns = [self.col_name_dict[c] for c in raw_df.columns]
         raw_df.rename(self.col_name_dict, axis=1, inplace=True)
         raw_df['abs_time'] = pd.to_datetime(raw_df.abs_time)
-        raw_df.loc[:, 'mAh'] = cumtrapz(raw_df.curr, raw_df.float_time, initial=0) / 3600
+        raw_df.loc[:, 'mAh'] = cumulative_trapezoid(raw_df.curr, raw_df.float_time, initial=0) / 3600
         nbr_of_unique_steps = raw_df[raw_df.step.diff() != 0].shape[0]
         raw_df.loc[raw_df.step.diff() != 0, 'unq_step'] = range(1, nbr_of_unique_steps + 1)
         df = raw_df.fillna(method='ffill').fillna(method='bfill').dropna(how='all', axis=1).copy()
@@ -194,12 +194,12 @@ class BasePecData(object):
 
     @staticmethod
     def calc_step_cap(group):
-        group['step_cap'] = cumtrapz(group.curr, group.float_step_time, initial=0) / 3.6
+        group['step_cap'] = cumulative_trapezoid(group.curr, group.float_step_time, initial=0) / 3.6
         return group
 
     @staticmethod
     def calc_step_egy(group):
-        group['step_egy'] = cumtrapz(group.curr * group.volt, group.float_step_time, initial=0) / 3.6
+        group['step_egy'] = cumulative_trapezoid(group.curr * group.volt, group.float_step_time, initial=0) / 3.6
         return group
 
     def fill_step_cap(self):
@@ -209,7 +209,7 @@ class BasePecData(object):
         df = self.dyn_data
         df['step_cap'] = (
             df.groupby(by='unq_step')
-            .apply(lambda g: cumtrapz(g['curr'], g['float_step_time'], initial=0) / 3.6)
+            .apply(lambda g: cumulative_trapezoid(g['curr'], g['float_step_time'], initial=0) / 3.6)
             .explode()
             .to_numpy()
         )
@@ -219,7 +219,7 @@ class BasePecData(object):
         df = self.dyn_data
         df['step_egy'] = (
             df.groupby(by='unq_step')
-            .apply(lambda group: cumtrapz(group.curr * group.volt, group.float_step_time, initial=0)/3.6).
+            .apply(lambda group: cumulative_trapezoid(group.curr * group.volt, group.float_step_time, initial=0)/3.6).
             explode().to_numpy()
         )
         return df
