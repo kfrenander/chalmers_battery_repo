@@ -1,36 +1,12 @@
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, differential_evolution
 from test_data_analysis.BasePecDataClass import BasePecRpt, find_step_characteristics_fast
 from test_data_analysis.pec_lifetest import PecLifeTestData
+from misc_classes.pulse_charge_style_class import TestCaseStyler
 import os
 import re
-
-
-class TestCaseStyler:
-    def __init__(self):
-        self.test_case_styles = {
-            '10 Hz 25 duty cycle pulse': {'color': '#1f77b4', 'marker': 'o', 'linestyle': '--', 'label': '10Hz 25% Duty Pulse'},
-            '10 Hz 50 duty cycle pulse': {'color': '#ff7f0e', 'marker': 's', 'linestyle': '--', 'label': '10Hz 50% Duty Pulse'},
-            '125 Hz 25 duty cycle pulse': {'color': '#2ca02c', 'marker': '^', 'linestyle': '-.', 'label': '125Hz 25% Duty Pulse'},
-            '1C reference': {'color': '#d62728', 'marker': 'x', 'linestyle': '-', 'label': '1C Reference'},
-            '1 Hz 25 duty cycle pulse': {'color': '#9467bd', 'marker': '.', 'linestyle': ':', 'label': '1Hz 25% Duty Pulse'},
-            '1 Hz 50 duty cycle pulse': {'color': '#8c564b', 'marker': '8', 'linestyle': ':', 'label': '1Hz 50% Duty Pulse'},
-            '50 Hz 25 duty cycle pulse': {'color': '#e377c2', 'marker': 'v', 'linestyle': '-.', 'label': '50Hz 25% Duty Pulse'},
-            '50 Hz 50 duty cycle pulse': {'color': '#7f7f7f', 'marker': '+', 'linestyle': '-.', 'label': '50Hz 50% Duty Pulse'},
-        }
-
-    def get_style(self, case_name):
-        """
-        Returns the style dictionary for the given test case name.
-        If the case is not found, returns a default style.
-        """
-        return self.test_case_styles.get(case_name, {
-            'color': 'gray',
-            'marker': '.',
-            'linestyle': '-',
-            'label': case_name,
-        })
 
 
 class PecSmartCellData(PecLifeTestData):
@@ -44,7 +20,7 @@ class PecSmartCellData(PecLifeTestData):
         self.set_op_dir()
         self.write_files()
         self.line_styler = TestCaseStyler()
-        self.style = self.line_styler.get_style(self.formatted_metadata['OUTPUT_NAME'])
+        self.style = self.line_styler.get_abbrv_style(self.formatted_metadata['OUTPUT_NAME'])
         self.popt = None
         self.pcov = None
         self._complement_metadata()
@@ -66,10 +42,41 @@ class PecSmartCellData(PecLifeTestData):
         """
         x_data = self.rpt_obj.rpt_summary.fce.astype('float')
         y_data = self.rpt_obj.rpt_summary.cap_normalised.astype('float')
-        popt, pcov = curve_fit(self._q_function, x_data, y_data, p0=[1, 100, 1])
+
+        # Define the objective function for differential evolution
+        def objective(params):
+            q0, tau, beta = params
+            return np.sum((y_data - self._q_function(x_data, q0, tau, beta)) ** 2)
+
+        # Use differential evolution to get initial parameters
+        bounds = [(0, 10), (0.1, 1e10), (0.1, 5)]
+        result = differential_evolution(objective, bounds, strategy='best1bin', tol=1e-5)
+        initial_guess = result.x  # Use this as initial guess for curve_fit
+
+        popt, pcov = curve_fit(self._q_function, x_data, y_data, p0=[1, 1000, 1])
         self.popt = popt
         self.pcov = pcov
         return popt, pcov
+
+    def visualise_fit_function(self):
+        if self.popt is None:
+            _, _ = self.fit_degradation_function()
+        labels = [r"$q_0$", r"$\tau$", r"$\beta$"]
+        plt.figure()
+        x_data = self.rpt_obj.rpt_summary.fce.astype('float')
+        y_data = self.rpt_obj.rpt_summary.cap_normalised.astype('float')
+        x_model = np.linspace(x_data.min(), x_data.max(), 100)
+        y_model = self._q_function(x_model, *self.popt)
+        plt.plot(x_model, y_model, label='Fit')
+        plt.scatter(x_data, y_data, color='red', label='Raw')
+        text_str = "\n".join(f"{label} = {value:.2f}" for label, value in zip(labels, self.popt))
+        plt.text(20, 0.9, text_str, verticalalignment='top',
+                 bbox={'facecolor': 'white', 'boxstyle': 'round'})
+        ax = plt.gca()
+        ymin, ymax = ax.get_ylim()
+        ymin = min(ymin, 0.85)
+        ax.set_ylim((ymin, ymax))
+        plt.show()
 
     def find_fce_at_given_q(self, q_target):
         """
@@ -297,6 +304,7 @@ class PecSmartCellRpt(BasePecRpt):
 
 if __name__ == '__main__':
     from check_current_os import get_base_path_batt_lab_data
+    plt.style.use('widthsixinches')
     BASE_PATH = get_base_path_batt_lab_data()
     test_file_path = r"pulse_chrg_test\high_frequency_testing\PEC_export\Test2818_Cell-1.csv"
     test_file = os.path.join(BASE_PATH, test_file_path)
@@ -304,4 +312,5 @@ if __name__ == '__main__':
     class_test = PecSmartCellData(test_file, op_bool=0)
     df = class_test.rpt_obj.rpt_summary
     class_test.fit_degradation_function()
+    class_test.visualise_fit_function()
     filtered_ici = class_test.filter_ici_on_cap(np.arange(1, 0.8, -0.1))

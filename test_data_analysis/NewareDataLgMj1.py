@@ -21,13 +21,13 @@ class LgNewareDataSet(BaseNewareDataSet):
             # chan_id = re.findall(r'\b\d\b', key)
             # chan_number = '_'.join(chan_id)
             # exp_name = f'pickle_files_channel_{chan_number}'
-            exp_name = f'pickle_files_channel_{key}'
+            search_pattern = os.path.join(root_dir, f'pickle_files_channel_{key.replace("-", "_")}*/')
             print(f'Calling Neware data with {key}')
             tic = dt.datetime.now()
-            pkl_dir = os.path.join(root_dir, exp_name.replace('-', '_'))
-            if os.path.exists(pkl_dir):
+            pkl_dir = [fldr for fldr in glob.glob(search_pattern) if os.path.isdir(fldr)]
+            if len(pkl_dir) > 0:
                 print('Files already read. \nWill check if metadata update needed')
-                metadata_files = glob.glob(os.path.join(pkl_dir, 'metadata*.txt'))
+                metadata_files = glob.glob(os.path.join(pkl_dir[0], 'metadata*.txt'))
                 if metadata_files:
                     print('Metadata files already generated, no update needed')
                 else:
@@ -58,11 +58,6 @@ class LgNewareData(BaseNewareData):
         self.test_name = self.look_up_test_name(self.channel_name)
         debug_start = time.time()
         super().step_characteristics()
-        # df_split = np.array_split(self.dyn_df, n_cores)
-        # pool = Pool(n_cores)
-        # self.step_char = pd.concat(pool.map(characterise_steps, df_split))
-        # pool.close()
-        # pool.join()
         print(f'Time for characterisation was {time.time() - debug_start:.2f} seconds.')
         super().find_ici_steps()
         super().find_ica_steps()
@@ -140,7 +135,7 @@ class LgRptData(BaseRptData):
                 step_df = self.char_dict[key][self.char_dict[key].step_nbr == stp]
                 if ((step_df['step_mode'][0] == 'CC_DChg' or step_df['step_mode'][0] == 'CC DChg') and (ref_df['step_mode'][0] == 'CCCV_Chg' or ref_df['step_mode'][0] == 'CCCV Chg')):
                     if abs(step_df.curr[0] + 1.15) < 0.2 and step_df['maxV'][0] > 4 and step_df['minV'][0] < 3:
-                        print(f'Cap at rpt {i:.0f} is {step_df.cap[0]:.2f} mAh')
+                        print(f'Cap {i:.0f} at {key} is {step_df.cap[0]:.2f} mAh')
                         cap_df.loc[f'cap_meas_{i}'] = step_df.cap.values
                         # tmp_cap_df = pd.DataFrame(data=step_df.cap.values, columns=['cap'], index=[f'cap_meas_{i}'])
                         # cap_df = pd.concat([cap_df, tmp_cap_df])
@@ -159,7 +154,7 @@ if __name__ == '__main__':
     outer_tic = dt.datetime.now()
     BASE_PATH = get_base_path_batt_lab_data()
     stat_test = "stat_test/cycling_data"
-    pulse_charge = "pulse_chrg_test/cycling_data_ici"
+    pulse_charge = "pulse_chrg_test/cycling_data_repaired"
     test_case = LgNewareDataSet(os.path.join(BASE_PATH, pulse_charge))
     outer_toc = dt.datetime.now()
     print(f'Total elapsed time was {(outer_toc - outer_tic).total_seconds() / 60:.2f} min.')

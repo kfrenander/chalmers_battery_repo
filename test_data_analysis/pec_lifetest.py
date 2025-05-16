@@ -1,5 +1,3 @@
-import re
-
 from test_data_analysis.BasePecDataClass import BasePecData
 from test_data_analysis.ici_analysis_class import ICIAnalysis
 from test_data_analysis.pec_metadata_reader import PECMetadata
@@ -7,8 +5,8 @@ from test_data_analysis.pec_metadata_reader import PECMetadata
 
 class PecLifeTestData(BasePecData):
 
-    def __init__(self, fname, data_init_row=24):
-        super().__init__(fname, data_init_row=24)
+    def __init__(self, filename):
+        super().__init__(filename)
         self.rpt_dict = {}
         self.ici_dict = {}
         self.find_all_rpt()

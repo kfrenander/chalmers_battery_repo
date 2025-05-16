@@ -83,8 +83,10 @@ class PECMetadata:
         # Check if we have a unique result
         if len(filtered_df) == 0:
             warnings.warn('No matching cell found in metadata')
+            print('Failed with call', kwargs)
             return {}
         elif len(filtered_df) > 1:
+            print('Non-unique with call', kwargs)
             raise ValueError("Query matches more than one test. Please provide additional metadata.")
 
         # Convert the row to a dictionary
