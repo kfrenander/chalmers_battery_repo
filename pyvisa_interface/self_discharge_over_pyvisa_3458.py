@@ -1,13 +1,17 @@
 import pyvisa
 import time
 import numpy as np
+import os
 
 
 rm = pyvisa.ResourceManager()
 devices = rm.list_resources()
 print(devices)
 
-op_file = '/data/self-discharge-logs/self-discharge-measurement-1'
+op_fldr = '/data/self-discharge-logs'
+os.makedirs(op_fldr, exist_ok=True)
+op_file = os.path.join(op_fldr, 'self-discharge-measurement-1')
+print(f'Saving data to {op_file}')
 
 instr21 = 'GPIB0::21::INSTR'
 instr22 = 'GPIB0::22::INSTR'
