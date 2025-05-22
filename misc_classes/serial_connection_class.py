@@ -2,6 +2,8 @@ import serial
 import serial.tools.list_ports
 from time import sleep
 
+from sandbox.one_off_scripts.serial_interface_peak_tech import response
+
 
 # --- Helper function to list available ports ---
 def list_serial_ports():
@@ -40,17 +42,35 @@ class SerialManager:
             self.serial_conn.close()
             print("Serial connection closed.")
 
-    def send_command(self, command: str):
+    def send_command(self, command: str, newline: str = "\r\n"):
         """Send a command (string) to the device."""
         if not self.serial_conn or not self.serial_conn.is_open:
             print("Error: Not connected to device!")
             return
 
         try:
-            self.serial_conn.write(command.encode())
+            self.serial_conn.reset_output_buffer()
+            self.serial_conn.write((command + newline).encode())
             print(f"Sent: {command}")
         except serial.SerialException as e:
             print(f"Error sending command: {e}")
+
+    def read_all_responses(self) -> list[str]:
+        """Read and return all available lines from the buffer."""
+        responses = []
+        if not self.serial_conn or not self.serial_conn.is_open:
+            print("Error: Not connected to device!")
+            return responses
+
+        try:
+            while self.serial_conn.in_waiting > 0:
+                line = self.serial_conn.readline().decode('utf-8', errors='replace').strip()
+                if line:
+                    responses.append(line)
+        except serial.SerialException as e:
+            print(f"Error reading response: {e}")
+            return responses
+
 
     def read_response(self) -> str:
         """Read response from the device."""
@@ -65,6 +85,18 @@ class SerialManager:
         except serial.SerialException as e:
             print(f"Error reading response: {e}")
             return ""
+
+    def send_and_get_all(self, command: str, wait: float = 0.1) -> list[str]:
+        self.send_command(command)
+        sleep(wait)  # Give device time to respond
+        return self.read_all_responses()
+
+    def __enter__(self):
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
 
 
 if __name__ == "__main__":
@@ -81,9 +113,7 @@ if __name__ == "__main__":
 
     # Example: Send a command and read response
     if ser_mgr.serial_conn and ser_mgr.serial_conn.is_open:
-        ser_mgr.send_command("HELLO")  # Replace with your device's command
-        sleep(0.1)  # Small delay for device response
-        response = ser_mgr.read_response()
+        response = ser_mgr.send_and_get_all("&q100!", wait=0.1)
         print(f"Device says: {response}")
 
     # Cleanup
