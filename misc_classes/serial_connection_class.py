@@ -2,8 +2,6 @@ import serial
 import serial.tools.list_ports
 from time import sleep
 
-from sandbox.one_off_scripts.serial_interface_peak_tech import response
-
 
 # --- Helper function to list available ports ---
 def list_serial_ports():
@@ -55,7 +53,7 @@ class SerialManager:
         except serial.SerialException as e:
             print(f"Error sending command: {e}")
 
-    def read_all_responses(self) -> list[str]:
+    def read_all_responses(self) -> [str]:
         """Read and return all available lines from the buffer."""
         responses = []
         if not self.serial_conn or not self.serial_conn.is_open:
@@ -67,10 +65,10 @@ class SerialManager:
                 line = self.serial_conn.readline().decode('utf-8', errors='replace').strip()
                 if line:
                     responses.append(line)
+            return responses
         except serial.SerialException as e:
             print(f"Error reading response: {e}")
             return responses
-
 
     def read_response(self) -> str:
         """Read response from the device."""
@@ -86,7 +84,7 @@ class SerialManager:
             print(f"Error reading response: {e}")
             return ""
 
-    def send_and_get_all(self, command: str, wait: float = 0.1) -> list[str]:
+    def send_and_get_all(self, command: str, wait: float = 0.1) -> [str]:
         self.send_command(command)
         sleep(wait)  # Give device time to respond
         return self.read_all_responses()
